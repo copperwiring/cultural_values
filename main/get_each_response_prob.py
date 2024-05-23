@@ -56,24 +56,13 @@ def eval_model(model_path, image_file, query, options):
     disable_torch_init()
 
     model_name = get_model_name_from_path(model_path)
+
     tokenizer, model, image_processor, context_len = load_pretrained_model(
         model_path, None, model_name
     )
 
     qs = query
     img_file = image_file
-    # image_token_se = DEFAULT_IM_START_TOKEN + DEFAULT_IMAGE_TOKEN + DEFAULT_IM_END_TOKEN
-    # if IMAGE_PLACEHOLDER in qs: # IMAGE_PLACEHOLDER is 
-    #     if model.config.mm_use_im_start_end:
-    #         qs = re.sub(IMAGE_PLACEHOLDER, image_token_se, qs)
-    #     else:
-    #         qs = re.sub(IMAGE_PLACEHOLDER, DEFAULT_IMAGE_TOKEN, qs)
-    # else:
-    #     if model.config.mm_use_im_start_end:
-    #         qs = image_token_se + "\n" + qs
-    #     else:
-    #         # qs = DEFAULT_IMAGE_TOKEN + "\n" + qs
-    #         qs = qs
     
     image_token_se = DEFAULT_IM_START_TOKEN + DEFAULT_IMAGE_TOKEN + DEFAULT_IM_END_TOKEN
 
@@ -93,6 +82,10 @@ def eval_model(model_path, image_file, query, options):
 
     if "llama-2" in model_name.lower():
         conv_mode = "llava_llama_2"
+    elif "mistral" in model_name.lower():
+        conv_mode = "mistral_instruct"
+    elif "v1.6-34b" in model_name.lower():
+        conv_mode = "chatml_direct"
     elif "v1" in model_name.lower():
         conv_mode = "llava_v1"
     elif "mpt" in model_name.lower():
@@ -137,10 +130,10 @@ def eval_model(model_path, image_file, query, options):
                 input_ids=input_ids,
                 labels=input_ids,
                 attention_mask=attention_mask,
-                images=images_tensor,
+                images=images_tensor
                 )
-
-        log_lik_scores.append((option, -outputs.loss.item()))
+        log_score = -outputs.loss.item()
+        log_lik_scores.append((option, log_score))
 
     pred_id = np.argmax(np.asarray([x[1] for x in log_lik_scores]))
     print(log_lik_scores)
@@ -184,17 +177,16 @@ if __name__ == '__main__':
     sub_dir_path = os.path.join(base_dir, sub_dir)
     # image_file = sub_dir_path + '/' + sub_dir_path.split('/')[-1] + '.jpg'
 
-    image_file = "data/dollarstreet/assets/5d4bde20cf0b3a0f3f3359f7/5d4bde20cf0b3a0f3f3359f7.jpg"
+    # image_file = "data/dollarstreet/assets/5d4bde20cf0b3a0f3f3359f7/5d4bde20cf0b3a0f3f3359f7.jpg"
+    image_file = "https://llava-vl.github.io/static/images/view.jpg"
 
     prompt = """Human: We are going to do object detection. What do you see in the image? \n\n                
     Here are the options: \n\n                    
-    [\'(A) People\', 
-    \'(B) Cat\', 
-    \'(C) Dog\', 
-    \'(D) Building\', 
-    \'(E) Don\'t know\', 
-    \'(F) No answer\'
-    \'(G) Invalid option\' \n\n
+    [\'(A) cat\', 
+    \'(B) river\', 
+    \'(C) dog\',
+    \'(G) Invalid option\'
+    ] \n\n
     """    
 
     # prompt = """Human: How satisfied are you with the following? \n\n
@@ -208,10 +200,11 @@ if __name__ == '__main__':
     # \'(F) No answer\'
     # \'(G) Invalid option\' \n\n
     # """    
-
-    shared_prompt = """Assistant: If had to select one of the options, my answer would be ("""
-
-    options = [shared_prompt+x for x in  ['A', 'B', 'C', 'D', 'E', 'F', 'G']]
+    prompt = """Describe the image. \n\n"""
+    # shared_prompt = """Assistant: If had to select one of the options, my answer would be """
+    shared_prompt = 'This is an image of a '
+    # shared_prompt = 'This is an image of a '
+    options = [shared_prompt+x for x in  ['cat', 'river', 'dog', 'Invalid option']]
 
     # options = [shared_prompt+x for x in  ['A) Completely dissatisfied', 'B) Rather dissatisfied', 'C) Rather satisfied', 'D) Completely satisfied', "E) Don't know", 'F) No answer']]
 
