@@ -58,9 +58,11 @@ class Conversation:
                 if message:
                     if type(message) is tuple:
                         message, _, _ = message
-                    ret += role + ": " + message + seps[i % 2]
+                    ret += role + message + seps[i % 2]                    
+                    # ret += role + ": " + message + seps[i % 2]
                 else:
-                    ret += role + ":"
+                    # ret += role + ":"
+                    ret += role 
         elif self.sep_style == SeparatorStyle.MPT:
             ret = self.system + self.sep
             for role, message in messages:
@@ -269,6 +271,7 @@ conv_llava_llama_2 = Conversation(
            "You are able to understand the visual content that the user provides, "
            "and assist the user with a variety of tasks using natural language.",
     roles=("USER", "ASSISTANT"),
+    # roles=("Human", ""),
     version="llama_v2",
     messages=(),
     offset=0,
@@ -325,8 +328,8 @@ conv_llava_v0_mmtag = Conversation(
 conv_llava_v1 = Conversation(
     system="A chat between a curious human and an artificial intelligence assistant. "
            "The assistant gives helpful, detailed, and polite answers to the human's questions.",
-    roles=("USER", "ASSISTANT"),
-    version="v1",
+    # roles=("USER", "ASSISTANT"),
+    roles=("Human", "("),
     messages=(),
     offset=0,
     sep_style=SeparatorStyle.TWO,

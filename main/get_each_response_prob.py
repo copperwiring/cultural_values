@@ -100,64 +100,77 @@ class LLavaModelEvaluator:
             images_tensor = None
             image_sizes = None
 
-        option_probabilities = {}
-        option_logits = {}
 
-        print(f"Options: {options}")
+        target_prompt = prompt 
+        input_ids = tokenizer_image_token(target_prompt, 
+                                            self.tokenizer, 
+                                            IMAGE_TOKEN_INDEX, 
+                                            return_tensors="pt"
+                                            ).unsqueeze(0).cuda()
+        attention_mask = torch.ones_like(input_ids)
+
+        with torch.inference_mode(), torch.cuda.amp.autocast():
+            outputs = self.model.forward(
+                input_ids=input_ids, 
+                images=None if images_tensor is None else images_tensor,
+                image_sizes=image_sizes,
+                attention_mask=attention_mask
+                )
+        
+        logits = outputs.logits[:, -1, :]  # Get the logits for the last token position
+        probabilities = F.softmax(logits, dim=-1).squeeze()
+
+        # Get all predicted tokens and their probabilities
+        all_probs, all_indices = torch.topk(probabilities, probabilities.size(0))
+        all_tokens = self.tokenizer.convert_ids_to_tokens(all_indices)
+        
+        # Get top 10 predicted tokens and their probabilities
+        top_5probs, top_5indices = torch.topk(probabilities, 10)
+        top_5tokens = self.tokenizer.convert_ids_to_tokens(top_5indices)
+
+        print("Top 10 predicted tokens, their index and their probabilities:")
+        for token, index, prob in zip(top_5tokens, top_5indices, top_5probs):
+            print(f"{token}: {index}:{prob:.20f}")   
+
+
+        new_options = ["▁A", "▁B", "▁C", "▁D", "▁E", "▁F", "▁G"]
+        new_token_prob_options = {token: probabilities[self.tokenizer.convert_tokens_to_ids(token)] for token in new_options}
+        sorted_new_token_prob_options = sorted(new_token_prob_options.items(), key=lambda x: x[1], reverse=True)
+        sorted_new_token_ids = {self.tokenizer.convert_tokens_to_ids(token): prob for token, prob in sorted_new_token_prob_options}
         print("*" * 50)
-        for option in options:
-            target_prompt = prompt + ' ' + option
-            input_ids = tokenizer_image_token(target_prompt, 
-                                              self.tokenizer, 
-                                              IMAGE_TOKEN_INDEX, 
-                                              return_tensors="pt"
-                                              ).unsqueeze(0).cuda()
-            attention_mask = torch.ones_like(input_ids)
+        print(f"Token, index, probability of options: {new_options} in vocab:")
+        for token, id, prob in zip(sorted_new_token_prob_options, sorted_new_token_ids.keys(), sorted_new_token_ids.values()):
+            print(f"{token[0]}, {id}, {prob:.20f}")
 
-            with torch.inference_mode(), torch.cuda.amp.autocast():
-                outputs = self.model.forward(
-                    input_ids=input_ids, 
-                    images=None if images_tensor is None else images_tensor,
-                    image_sizes=image_sizes,
-                    attention_mask=attention_mask
-                    )
-            
-            logits = outputs.logits[:, -1, :]  # Get the logits for the last token position
-            option_logits[option] = logits
-            probabilities = F.softmax(logits, dim=-1).squeeze()
-            option_index = self.tokenizer.convert_tokens_to_ids(option)
-            option_probabilities[option] = probabilities[option_index].item()
-
-            # Get the top 10 predicted tokens and their probabilities
-            top_probs, top_indices = torch.topk(probabilities, 5)
-            top_tokens = self.tokenizer.convert_ids_to_tokens(top_indices)
-
-            print(f"\nOption: '{option}':")
-            print(f"Probability of '{option}': {option_probabilities[option]:.12f}")
-            print("Top 5 predicted tokens (i.e. last token) and probabilities:")
-            for token, prob in zip(top_tokens, top_probs):
-                print(f"{token}: {prob.item():.12f}")        
-
-        sorted_options = sorted(option_probabilities.items(), key=lambda x: x[1], reverse=True)
-        self.print_ranked_options(sorted_options)
-
-    def print_ranked_options(self, sorted_options):
         print("*" * 50)
-        print("Ranked options by their probabilities in vocab:")
-        for option, probability in sorted_options:
-            print(f"{option}:  {probability:.12f}")
+        token_prob_options = {token: probabilities[self.tokenizer.convert_tokens_to_ids(token)] for token in options}
+        sorted_token_prob_options = sorted(token_prob_options.items(), key=lambda x: x[1], reverse=True)
+        sorted_token_ids = {self.tokenizer.convert_tokens_to_ids(token): prob for token, prob in sorted_token_prob_options}
+        print(f"Token, index, probability of options: {options} in vocab:")
+        # sorted_token_prob_options is list of tuples and sorted_token_ids is dict
+        for token, id, prob in zip(sorted_token_prob_options, sorted_token_ids.keys(), sorted_token_ids.values()):
+            print(f"{token[0]}, {id}, {prob:.20f}")
+
+    
+        self.print_ranked_options(sorted_token_prob_options, options)
+        self.print_ranked_options(sorted_new_token_prob_options, new_options)
+        print("Done")
+
+    def print_ranked_options(self, sorted_options, options):
+        # print("*" * 50)
+        # print("Ranked options by their probabilities in vocab:")
+        # for option, probability in sorted_options:
+        #     print(f"{option}:  {probability:.12f}")
 
         total_prob = sum(prob for _, prob in sorted_options)
         normalized_probabilities = {opt: prob / total_prob for opt, prob in sorted_options}
 
         print("*" * 50)
-        print("Ranked options by their normalized probabilities:")
+        print(f"Ranked options:{options} by their normalized probabilities in %:")
         for option, probability in sorted_options:
             print(f"{option}: {normalized_probabilities[option] * 100:.2f}%")
 
-        print("-" * 50)
         print(f"Sum of probabilities in %: {sum(normalized_probabilities.values()) * 100:.2f}%")
-        print("*" * 50)
 
 if __name__ == '__main__':
     model_path = "liuhaotian/llava-v1.5-7b"
@@ -171,34 +184,36 @@ if __name__ == '__main__':
     sub_dir_path = os.path.join(base_dir, sub_dir)
     
     image_file_ds = "data/dollarstreet/assets/5d4bde20cf0b3a0f3f3359f7/5d4bde20cf0b3a0f3f3359f7.jpg"
-    prompt_ds = """Human: How satisfied are you with the following? \n\n
+    prompt_ds = """How satisfied are you with the following? \n\n
     The way the local authorities are solving the region’s affairs \n\n                    
     Here are the options: \n\n                    
-    ['(A) Completely dissatisfied', 
-    '(B) Rather dissatisfied', 
-    '(C) Rather satisfied', 
-    '(D) Completely satisfied', 
-    '(E) Don\'t know', 
-    '(F) No answer'
-    '(G) Invalid option'] \n\n
-    Assistant: If had to select one of the options, my answer would be """
+    [A. Completely dissatisfied, 
+    B. Rather dissatisfied, 
+    C. Rather satisfied, 
+    D. Completely satisfied, 
+    E. Don\'t know, 
+    F. No answer
+    G. Invalid option] \n\n
+    ASSISTANT: If had to select one of the options, my answer would be"""
+
 
     options_ds = ['A', 'B', 'C', 'D', 'E', 'F', 'G']
+    # options_ds = ['Completely dissatisfied', 'Rather dissatisfied', 'Rather satisfied', 'Completely satisfied', 'Don\'t know', 'No answer', 'Invalid option']
+    options_ds = sorted(options_ds)
 
     # -----------------------------------------
-    image_file = "https://cdn.pixabay.com/photo/2023/08/18/15/02/dog-8198719_640.jpg"
-    # image_file = ""
+    # image_file = "https://cdn.pixabay.com/photo/2023/08/18/15/02/dog-8198719_640.jpg"
+    image_file = "https://images.twinkl.co.uk/tw1n/image/private/t_630/u/ux/pc_ver_1.png"
     # image_file = "https://llava-vl.github.io/static/images/view.jpg"
-    prompt = """What object is in the image? The image has a \n\n"""
-    # shared_prompt = 'This is an image of a: '
-    # options = ['balloon', 'potato', 'river', 'hands', 'umbrella']
-    options = ['monkey', 'tree', 'water', 'animal', 'dog']
+    prompt = """This is the photo of a :\n\n"""
+    options = ["dog", "animal", "computer", "river", "▁computer", "▁Computer"]
+    options = sorted(options)
     
 
     # ds =  dollarstory. 
     # Set to True to use the ds version inputs. 
     # Set to False to use the image classification version inputs for sanity check.
-    use_ds_version = False  
+    use_ds_version = True  
 
     if use_ds_version:
         evaluator.eval_model(image_file_ds, prompt_ds, options_ds)
