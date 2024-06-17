@@ -1,1 +1,5 @@
 data/
+
+# image files
+*.png
+*.jpg

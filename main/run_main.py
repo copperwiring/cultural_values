@@ -46,25 +46,30 @@ def main(user_choice=False):
     print(f"Total samples filtered dollarstreet data: {family_data.shape[0]} * {len(questions)} = {family_data.shape[0] * len(questions)}")
     print("*"*60)
 
-    num_samples = int(input("How many samples do you want to process? (Default is all): ") or family_data.shape[0])
+    # num_samples = int(input("How many samples do you want to process? (Default is all): ") or family_data.shape[0])
     def_n_questions = len(questions) # Number of questions to process
     # def_n_questions = 7 # Number of questions to process
 
-    print(f"In default model -  We will process {num_samples} samples with {def_n_questions} questions.")
-    print(f"Total data points to process: {num_samples * def_n_questions} in different combinations.")
+    # print(f"In default model -  We will process {num_samples} samples with {def_n_questions} questions.")
+    # print(f"Total data points to process: {num_samples * def_n_questions} in different combinations.")
 
     output_dir = "output/"
     # Delete directory if it exists and create a new one
-    if os.path.exists(output_dir):
-        shutil.rmtree(output_dir)
-    os.makedirs(output_dir)
+    # if os.path.exists(output_dir):
+    #     shutil.rmtree(output_dir)
+    # os.makedirs(output_dir)
 
     if user_choice:
-        use_images = input("Do you want to use images? (Yes/No): ").strip().lower() in ['yes', 'y'] # Default is Yes
-        use_country_name = input("Do you want to use country name in the prompt? (Yes/No): ").strip().lower() in ['no', 'n'] # Default is No
+        use_images = input("Do you want to use images? (Yes/No): ").strip().lower()
+        assert use_images in ["yes", "y", "no", "n"], "Invalid choice. Please enter Yes or No."
+        use_images = True if use_images in ["yes", "y"] else False
+
+        use_country_name = input("Do you want to use country name in the prompt? (Yes/No): ").strip().lower() 
+        assert use_country_name in ["yes", "y", "no", "n"], "Invalid choice. Please enter Yes or No."
+        use_country_name = True if use_country_name in ["yes", "y"] else False
 
         processor = LLAVAProcessor(family_data['imageFullPath'].tolist(), questions[:def_n_questions], selections[:def_n_questions], labeled_options)
-        processed_data = processor.process_data(family_data, num_samples, use_images, use_country_name)
+        processed_data = processor.process_data(family_data, use_images, use_country_name)
 
         file_name = f'llava_output_img_{use_images}_country_{use_country_name}.csv'
         file_path = os.path.join(output_dir, file_name)
@@ -72,15 +77,15 @@ def main(user_choice=False):
         print(f"Processing complete. Results saved to {file_path}.")
     else:
         for use_images in [True, False]:
-            for use_country_name in [False]: # add True if needed
+            for use_country_name in [True]: # add True if needed
                 print("*"*60)
                 print(f"Combination: Images - {use_images}, Country Name - {use_country_name}")
                 processor = LLAVAProcessor(family_data['imageFullPath'].tolist(), questions[:def_n_questions], selections[:def_n_questions], labeled_options)
-                processed_data = processor.process_data(family_data, num_samples, use_images, use_country_name)
+                processed_data = processor.process_data(family_data, use_images, use_country_name, test=False)
                 
                 file_name = f'llava_img_{use_images}_country_{use_country_name}.csv'
                 file_path = os.path.join(output_dir, file_name)
-                processor.save_results(processed_data, file_path, use_images, use_country_name)
+                processor.save_results(processed_data, file_path)
                 print(f"Processing complete. Results saved to {file_path}.")
 
 if __name__ == "__main__":

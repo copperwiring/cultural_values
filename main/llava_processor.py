@@ -31,35 +31,40 @@ class LLAVAProcessor:
     # Instread of processing data with number of files, we should do for each country in the selection
     # Reason, we want to pass images based on country name.
     # We have questions and options for each country, so we can pass them as well.
-    def process_data(self, image_data, num_of_files, use_images, use_country_name):
+    def process_data(self, image_data, use_images, use_country_name, test=True):
         data = []
-        for i in tqdm(range(num_of_files)):
-            # choose country name from ith row of the image data
-            dollar_street_country = image_data.iloc[i]['country.name']
+        print("test", test)
+        questions = self.wvs_questions[:5] if test else self.wvs_questions
+        for n in tqdm(range(len(questions))):
 
-            img_file_path = self.img_files_paths[i] if use_images else None
-            image_id = image_data[image_data['imageFullPath'] == img_file_path]['id'].values[0] if use_images else None
+            # # TO CHECK:
+            # UPDATE COUNTRIES TO PROCESS BECAUSE WE DONT NEED ALL DOLLARSTREET COUNTRIES FOR ALL QUESTIONS
+            # IT DEPENDS ON THE QUESTION
+            self.wvs_selection[n] = eval(self.wvs_selection[n].replace("defaultdict(<class 'list'>, ", "").rstrip(")")) \
+                                                    if "defaultdict" in self.wvs_selection[n] \
+                                                    else self.wvs_selection[n]
+        
+            # find all countries in the selection from image_data which are in the selection
+            dollar_street_countries = image_data['country.name'].unique() 
+            countries_to_process = [country for country in dollar_street_countries if country in self.wvs_selection[n]]
+            # countries_to_process = dollar_street_country in self.wvs_selection[n]  
 
-            for n in range(len(self.wvs_questions)):
-                # TODO:
-                # UPDATE COUNTRIES TO PROCESS BECAUSE WE DONT NEED ALL DOLLARSTREET COUNTRIES FOR ALL QUESTIONS
-                # IT DEPENDS ON THE QUESTION
-                self.wvs_selection[n] = eval(self.wvs_selection[n].replace("defaultdict(<class 'list'>, ", "").rstrip(")")) \
-                                                         if "defaultdict" in self.wvs_selection[n] \
-                                                        else self.wvs_selection[n]
-                
-                countries_to_process = dollar_street_country in self.wvs_selection[n]  
-                if not countries_to_process:
-                    continue
+            # if not countries_to_process:
+            #     continue
+            for dollar_street_country in countries_to_process:
+
+                img_file_path = image_data[image_data['country.name'] == dollar_street_country]['imageFullPath'].values[0] if use_images else None
+                image_id = image_data[image_data['country.name'] == dollar_street_country]['id'].values[0] if use_images else None
+
                 wvs_country_distribution = self.wvs_selection[n][dollar_street_country]
 
                 ques_id = n # this is the index of the question
 
                 prompt, letter_options, full_options = self.make_prompt(n, dollar_street_country) if use_country_name else self.make_prompt(n)
                 options, token_prob_options, prob_percent, top10_token_prob = self.evaluate_model(prompt, \
-                                                                                                           img_file_path, \
-                                                                                                           letter_options, \
-                                                                                                           full_options)
+                                                                                                        img_file_path, \
+                                                                                                        letter_options, \
+                                                                                                        full_options)
                 # self.print_ranked_options(sorted_token_prob_options, options)
                 # self.print_ranked_options(sorted_underscore_token_prob_options, options_with_underscore)
                 result = [options, token_prob_options, prob_percent, top10_token_prob]
@@ -68,13 +73,13 @@ class LLAVAProcessor:
                 result_prob_option_dict = {token: prob.item() for token, prob in token_prob_options}
                 result_prob_percent_dict = prob_percent
                 result_formatted = self.format_result(ques_id, self.wvs_questions[n], 
-                                                      image_id, dollar_street_country, 
-                                                      use_images, use_country_name, img_file_path, 
-                                                      top10_token_prob,
-                                                      result_prob_percent_dict,
-                                                      result_prob_option_dict,
-                                                      wvs_country_distribution,
-                                                      prompt)
+                                                    image_id, dollar_street_country, 
+                                                    use_images, use_country_name, img_file_path, 
+                                                    top10_token_prob,
+                                                    result_prob_percent_dict,
+                                                    result_prob_option_dict,
+                                                    wvs_country_distribution,
+                                                    prompt)
                 data.append(result_formatted)
         return data
 
