@@ -53,7 +53,7 @@ def main(user_choice=False):
     # print(f"In default model -  We will process {num_samples} samples with {def_n_questions} questions.")
     # print(f"Total data points to process: {num_samples * def_n_questions} in different combinations.")
 
-    output_dir = "output/"
+    output_dir = "output_allimgs/"
     # Delete directory if it exists and create a new one
     # if os.path.exists(output_dir):
     #     shutil.rmtree(output_dir)
@@ -76,8 +76,8 @@ def main(user_choice=False):
         processor.save_results(processed_data, file_path)
         print(f"Processing complete. Results saved to {file_path}.")
     else:
-        for use_images in [True, False]:
-            for use_country_name in [True]: # add True if needed
+        for use_images in [True]:
+            for use_country_name in [False]: # add True if needed
                 print("*"*60)
                 print(f"Combination: Images - {use_images}, Country Name - {use_country_name}")
                 processor = LLAVAProcessor(family_data['imageFullPath'].tolist(), questions[:def_n_questions], selections[:def_n_questions], labeled_options)

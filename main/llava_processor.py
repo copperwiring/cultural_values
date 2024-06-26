@@ -34,7 +34,7 @@ class LLAVAProcessor:
     def process_data(self, image_data, use_images, use_country_name, test=True):
         data = []
         print("test", test)
-        questions = self.wvs_questions[:5] if test else self.wvs_questions
+        questions = self.wvs_questions[:2] if test else self.wvs_questions
         for n in tqdm(range(len(questions))):
 
             # # TO CHECK:
@@ -52,27 +52,33 @@ class LLAVAProcessor:
             # if not countries_to_process:
             #     continue
             for dollar_street_country in countries_to_process:
+                all_file_paths = image_data[image_data['country.name'] == dollar_street_country]['imageFullPath'].values
+                all_image_ids = image_data[image_data['country.name'] == dollar_street_country]['id'].values
+               
+                for each_img_file_path, each_image_id in zip(all_file_paths, all_image_ids):
+                    img_file_path = each_img_file_path if use_images else None
+                    image_id = each_image_id 
 
-                img_file_path = image_data[image_data['country.name'] == dollar_street_country]['imageFullPath'].values[0] if use_images else None
-                image_id = image_data[image_data['country.name'] == dollar_street_country]['id'].values[0] if use_images else None
+                    # img_file_path = image_data[image_data['country.name'] == dollar_street_country]['imageFullPath'].values[0] if use_images else None
+                    # image_id = image_data[image_data['country.name'] == dollar_street_country]['id'].values[0] if use_images else None
 
-                wvs_country_distribution = self.wvs_selection[n][dollar_street_country]
+                    wvs_country_distribution = self.wvs_selection[n][dollar_street_country]
 
-                ques_id = n # this is the index of the question
+                    ques_id = n # this is the index of the question
 
-                prompt, letter_options, full_options = self.make_prompt(n, dollar_street_country) if use_country_name else self.make_prompt(n)
-                options, token_prob_options, prob_percent, top10_token_prob = self.evaluate_model(prompt, \
+                    prompt, letter_options, full_options = self.make_prompt(n, dollar_street_country) if use_country_name else self.make_prompt(n)
+                    options, token_prob_options, prob_percent, top10_token_prob = self.evaluate_model(prompt, \
                                                                                                         img_file_path, \
                                                                                                         letter_options, \
                                                                                                         full_options)
-                # self.print_ranked_options(sorted_token_prob_options, options)
-                # self.print_ranked_options(sorted_underscore_token_prob_options, options_with_underscore)
-                result = [options, token_prob_options, prob_percent, top10_token_prob]
+                    # self.print_ranked_options(sorted_token_prob_options, options)
+                    # self.print_ranked_options(sorted_underscore_token_prob_options, options_with_underscore)
+                    result = [options, token_prob_options, prob_percent, top10_token_prob]
 
-                # norm_prob_options is a dictionary with options as keys and probabilities as values in a tensor e.g {'A': tensor(0.3, device='cuda:0')}
-                result_prob_option_dict = {token: prob.item() for token, prob in token_prob_options}
-                result_prob_percent_dict = prob_percent
-                result_formatted = self.format_result(ques_id, self.wvs_questions[n], 
+                    # norm_prob_options is a dictionary with options as keys and probabilities as values in a tensor e.g {'A': tensor(0.3, device='cuda:0')}
+                    result_prob_option_dict = {token: prob.item() for token, prob in token_prob_options}
+                    result_prob_percent_dict = prob_percent
+                    result_formatted = self.format_result(ques_id, self.wvs_questions[n], 
                                                     image_id, dollar_street_country, 
                                                     use_images, use_country_name, img_file_path, 
                                                     top10_token_prob,
@@ -80,7 +86,7 @@ class LLAVAProcessor:
                                                     result_prob_option_dict,
                                                     wvs_country_distribution,
                                                     prompt)
-                data.append(result_formatted)
+                    data.append(result_formatted)
         return data
 
     def evaluate_model(self, prompt, img_file, letter_options, full_option):
