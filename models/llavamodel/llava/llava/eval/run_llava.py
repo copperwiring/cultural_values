@@ -1,5 +1,5 @@
 import argparse
-import torch
+import torch, ast
 import torch.nn.functional as F
 
 from models.llavamodel.llava.llava.constants import (
@@ -27,8 +27,8 @@ import re
 from collections import defaultdict 
 
 
-def image_parser(args):
-    out = args.image_file.split(args.sep)
+def image_parser(image_file_str, sep):
+    out = image_file_str.split(sep)
     return out
 
 
@@ -81,27 +81,34 @@ def get_conv_mode(model_name):
     else:
         return "llava_v0"
     
-def get_prob_percent(token_prob_options):
+def get_prob_percent(token_prob_alloptions, len_letter_option):
+    token_prob_options = token_prob_alloptions[:len_letter_option]
     total_prob = sum(prob for _, prob in token_prob_options)
-    # normalized_probabilities = {option: round(prob.item() / total_prob.item(), 2) for option, prob in token_prob_options}
-    # calculate prob at % til 2 decimal places
-    prob_percent = {option: round(prob.item() / total_prob.item(), 2)*100 for option, prob in token_prob_options}
+    prob_percent = {option: round((prob / total_prob)*100, 2) for option, prob in token_prob_options}
     
-    # print("*" * 50)
-    # print(f"Ranked options:{token_prob_options} by their normalized probabilities in %:")
-    # for option, prob in normalized_probabilities.items():
-    #     print(f"{option}: {prob * 100:.2f}%")
-
-    # print(f"Sum of probabilities in %: {sum(normalized_probabilities.values()) * 100:.2f}%")
-
     return prob_percent
+
+# left padding
+def left_pad_sequence_to_max_length(sequence, max_length, padding_value=0):
+    """Pad a sequence to the desired max length."""
+    if len(sequence) >= max_length:
+        return sequence
+    return torch.cat([torch.full((max_length - len(sequence),), padding_value, dtype=sequence.dtype), sequence])
+
+# right padding
+def right_pad_sequence_to_max_length(sequence, max_length, padding_value=0):
+    """Pad a sequence to the desired max length with right padding."""
+    if len(sequence) >= max_length:
+        return sequence
+    # Create padding of appropriate length and append it to the sequence (right padding)
+    return torch.cat([sequence, torch.full((max_length - len(sequence),), padding_value, dtype=sequence.dtype)])
     
-def eval_model(args, letter_options=None, full_option=None):
+def eval_model(args, prompts_batch, img_files_batch=None, letter_options=None, full_options=None):
 
     model_name = get_model_name_from_path(args.model_path)
     tokenizer, model, image_processor, context_len = load_pretrained_model(args.model_path, args.model_base, model_name)
 
-    qs = get_prompt(args, model)
+    # qs = get_prompt(args, model)
 
     conv_mode = get_conv_mode(model_name)
     if args.conv_mode is not None and conv_mode != args.conv_mode:
@@ -113,90 +120,175 @@ def eval_model(args, letter_options=None, full_option=None):
     else:
         args.conv_mode = conv_mode
 
-    conv = conv_templates[args.conv_mode].copy()
-    conv.append_message(conv.roles[0], qs)
-    conv.append_message(conv.roles[1], None)
-    prompt = conv.get_prompt()
+    # conv = conv_templates[args.conv_mode].copy()
 
-    # print("*" * 50)
-    # print(f"Prompt: \n{prompt}")
-    # print("*" * 50)
+    batched_prompts = []
+    
+    # Process prompts in batch
+    for prompt in prompts_batch:
+        # Set args.query to the specific prompt in the batch
+        args.query = prompt
 
-    if args.image_file:
-        image_files = image_parser(args)
-        images = load_images(image_files)
-        image_sizes = [x.size for x in images]
-        images_tensor = process_images(images, image_processor, model.config).to(model.device, dtype=torch.float16)
+        # Generate the prompt for each input in the batch, with the correct image handling
+        qs = get_prompt(args, model)
+
+        # Create a new conversation template for each prompt in the batch
+        conv = conv_templates[args.conv_mode].copy()
+        conv.append_message(conv.roles[0], qs)
+        conv.append_message(conv.roles[1], None)
+
+        # Add the complete prompt for this instance to the batch
+        batched_prompts.append(conv.get_prompt())
+
+
+    # # max length for padding
+    max_len = max([len(tokenizer.encode(prompt)) for prompt in batched_prompts])
+
+    tokenizer.padding_side = "left"
+    tokenizer.model_max_length = max_len
+    
+    # Tokenize the batch of prompts
+    tokenized_prompts = [
+        tokenizer_image_token(prompt, tokenizer, IMAGE_TOKEN_INDEX, return_tensors="pt").unsqueeze(0)
+        for prompt in batched_prompts
+    ]
+
+    # Determine the maximum length of input_ids in the batch
+    max_len = max([len(tokenized_prompt.squeeze()) for tokenized_prompt in tokenized_prompts])
+
+    # Pad the input_ids to the maximum length
+    padded_tokenized_ids= [left_pad_sequence_to_max_length(tokenized_prompt.squeeze(), max_len) for tokenized_prompt in tokenized_prompts]
+    batched_input_ids = torch.stack(padded_tokenized_ids).to(model.device)
+
+
+    # input_ids = torch.cat(tokenized_prompts, dim=0).cuda()
+
+    # conv.append_message(conv.roles[0], qs)
+    # conv.append_message(conv.roles[1], None)
+    # prompt = conv.get_prompt()
+
+
+    # if args.image_file:
+    #     image_files = image_parser(args)
+    #     images = load_images(image_files)
+    #     image_sizes = [x.size for x in images]
+    #     images_tensor = process_images(images, image_processor, model.config).to(model.device, dtype=torch.float16)
+    # else:
+    #     images_tensor = None
+    #     image_sizes = None
+
+    # Process images if provided (batch image loading and processing)
+
+    # set device to cpu
+    # model.to("cpu")
+    if img_files_batch:
+        # For each batch, parse image files, load them, and process
+        image_files_batch = [image_parser(img_files, args.sep) for img_files in img_files_batch]
+        images = [load_images(image_files) for image_files in image_files_batch]
+        flat_images = [item for sublist in images for item in sublist]
+        images_tensor = process_images(flat_images, image_processor, model.config).to(model.device, dtype=torch.float16)
+        image_sizes = [img.size for img in flat_images]
     else:
         images_tensor = None
         image_sizes = None
 
-
-    target_prompt = prompt 
-    input_ids = tokenizer_image_token(target_prompt, 
-                                        tokenizer, 
-                                        IMAGE_TOKEN_INDEX, 
-                                        return_tensors="pt"
-                                        ).unsqueeze(0).cuda()
+    # target_prompt = prompt 
+    # input_ids = tokenizer_image_token(target_prompt, 
+    #                                     tokenizer, 
+    #                                     IMAGE_TOKEN_INDEX, 
+    #                                     return_tensors="pt"
+    #                                     ).unsqueeze(0).cuda()
     
-    attention_mask = torch.ones_like(input_ids)
+    # attention_mask = torch.ones_like(batched_input_ids)
+
+    # Generate attention mask
+    # def generate_attention_mask(padded_sequence, padding_value=tokenizer.pad_token_id):
+    #     """Generate attention mask for a padded sequence where 1 is for actual tokens and 0 is for padding."""
+    #     return (padded_sequence != padding_value).long()  # Mask: 1 for non-padding, 0 for padding
+
+    # # Generate attention masks for each prompt based on the padding
+    # attention_masks = [
+    #     generate_attention_mask(padded_prompt) for padded_prompt in padded_tokenized_ids
+    # ]
+
+    # Stack the attention masks for the batch
+    # batched_attention_mask = torch.stack(attention_masks).to(model.device)
 
     with torch.inference_mode(), torch.cuda.amp.autocast():
         outputs = model.forward(
-            input_ids=input_ids, 
+            input_ids=batched_input_ids, 
             images=None if images_tensor is None else images_tensor,
-            image_sizes=image_sizes,
-            attention_mask=attention_mask
-            )
+            image_sizes=image_sizes            )
     
     logits = outputs.logits[:, -1, :]  # Get the logits for the last token position
     probabilities = F.softmax(logits, dim=-1).squeeze()
 
-    # Get all predicted tokens and their probabilities
-    all_probs, all_indices = torch.topk(probabilities, probabilities.size(0))
-    all_tokens = tokenizer.convert_ids_to_tokens(all_indices)
-    
-    # Get top 10 predicted tokens and their probabilities
-    top_10probs, top_5indices = torch.topk(probabilities, 10)
-    top_10tokens = tokenizer.convert_ids_to_tokens(top_5indices)
+    # Initialize batched prompts empty dict
+    batch_results = {
+        'prompt': [],
+        'options': [],
+        'top10_token_prob': [],
+        'prob_percent_sorted': [],
+        'sum_prob_percent_sorted': [],
+        'prob_percent_keys': [],
+        'prob_percent_values': []
+    }
 
-    top10_token_prob = {token: prob for token, prob in zip(top_10tokens, top_10probs)}
-    top10_token_prob = [(token, prob.item()) for token, prob in top10_token_prob.items()]
+    # Process each instance in the batch
+    for i, (prompt, letter_option) in enumerate(zip(batched_prompts, letter_options)):
+        len_letter_option = len(ast.literal_eval(letter_option))
+        probs_for_instance = probabilities[i]  # Get probabilities for the i-th instance
+
+        # Get all predicted tokens and their probabilities
+        # all_probs, all_indices = torch.topk(probabilities, probabilities.size(0))
+        # all_tokens = tokenizer.convert_ids_to_tokens(all_indices)
+        
+        # Get top 10 predicted tokens and their probabilities
+        top_10probs, top_10indices = torch.topk(probs_for_instance, 10)
+        top_10tokens = tokenizer.convert_ids_to_tokens(top_10indices)
+
+        top10_token_prob = {token: prob for token, prob in zip(top_10tokens, top_10probs)}
+        top10_token_prob = [(token, prob.item()) for token, prob in top10_token_prob.items()]
+
+        # Process the options for evaluation
+        # token_prob_options = {token: probs_for_instance[tokenizer.convert_tokens_to_ids(token)] for token in letter_options}
+        # token_prob_options = [(token, prob) for token, prob in token_prob_options.items()]
+        # # sort by probability
+        # token_prob_options = sorted(token_prob_options, key=lambda x: x[1], reverse=True)
+
+        prob_percent = get_prob_percent(top10_token_prob, len_letter_option)
+
+        # sort prob_percent dict alphabetically by key
+        prob_percent_sorted = {k: prob_percent[k] for k in sorted(prob_percent)}
 
 
-    # print("Top 10 predicted tokens, their index and their probabilities:")
-    # for token, index, prob in zip(top_5tokens, top_5indices, top_5probs):
-    #     print(f"{token}: {index}:{prob:.20f}")   
+        # Append the result for this instance in the batch
+        batch_results['prompt'].append(prompt)
+        batch_results['options'].append(letter_option)
+        batch_results['top10_token_prob'].append(top10_token_prob)
+        batch_results['prob_percent_sorted'].append(prob_percent_sorted)
+        batch_results['sum_prob_percent_sorted'].append(sum(prob_percent_sorted.values()))
+        batch_results['prob_percent_keys'].append(list(prob_percent_sorted.keys()))
+        batch_results['prob_percent_values'].append(list(prob_percent_sorted.values()))
 
+    # print(f"Batch results: {batch_results}")
 
-    options = letter_options
-    token_prob_options = {token: probabilities[tokenizer.convert_tokens_to_ids(token)] for token in options}
-    # token_prob_options = sorted(token_prob_options.items(), key=lambda x: x[1], reverse=True)
-    token_prob_options = [(token, prob) for token, prob in token_prob_options.items()]
-    # token_ids = {tokenizer.convert_tokens_to_ids(token): prob for token, prob in token_prob_options}
-    # print(f"Token, index, probability of options: {options} in vocab:")
-    # for token, id, prob in zip(token_prob_options, token_ids.keys(), token_ids.values()):
-    #     print(f"{token[0]}, {id}, {prob:.20f}")
-
-
-    prob_percent = get_prob_percent(token_prob_options)
-
-    return options, token_prob_options, prob_percent, top10_token_prob
+    return batch_results
            
 
 
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--model-path", type=str, default="facebook/opt-350m")
-    parser.add_argument("--model-base", type=str, default=None)
-    parser.add_argument("--image-file", type=str, required=True)
-    parser.add_argument("--query", type=str, required=True)
-    parser.add_argument("--conv-mode", type=str, default=None)
-    parser.add_argument("--sep", type=str, default=",")
-    parser.add_argument("--temperature", type=float, default=0.2)
-    parser.add_argument("--top_p", type=float, default=None)
-    parser.add_argument("--num_beams", type=int, default=1)
-    parser.add_argument("--max_new_tokens", type=int, default=512)
-    args = parser.parse_args()
+# if __name__ == "__main__":
+#     parser = argparse.ArgumentParser()
+#     parser.add_argument("--model-path", type=str, default="facebook/opt-350m")
+#     parser.add_argument("--model-base", type=str, default=None)
+#     parser.add_argument("--image-file", type=str, required=True)
+#     parser.add_argument("--query", type=str, required=True)
+#     parser.add_argument("--conv-mode", type=str, default=None)
+#     parser.add_argument("--sep", type=str, default=",")
+#     parser.add_argument("--temperature", type=float, default=0.2)
+#     parser.add_argument("--top_p", type=float, default=None)
+#     parser.add_argument("--num_beams", type=int, default=1)
+#     parser.add_argument("--max_new_tokens", type=int, default=512)
+#     args = parser.parse_args()
 
-    eval_model(args)
+#     eval_model(args)

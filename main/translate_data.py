@@ -1,4 +1,4 @@
-from data_handling import DataLoader, DataProcessor
+from main.create_dataset.data_extractor import DataLoader, DataProcessor
 from llava_processor import LLAVAProcessor
 import os, shutil
 import pandas as pd

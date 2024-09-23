@@ -1,100 +1,128 @@
-from data_handling import DataLoader, DataProcessor
-from llava_processor import LLAVAProcessor
-import os, shutil
+import os, shutil, time, logging, ast
 import pandas as pd
-import time, ast
-
-import logging
+from tqdm import tqdm as tdqm
+from torch.utils.data import Dataset, DataLoader
 logging.disable(logging.CRITICAL)  # Disables all logging calls of severity 'CRITICAL' and below
+from models.llavamodel.llava.llava.mm_utils import get_model_name_from_path
+from models.llavamodel.llava.llava.eval.run_llava import eval_model
+
+start_time = time.time()
+
+output_dir = "output_results"
+# Delete directory if it exists and create a new one
+if os.path.exists(output_dir):
+    shutil.rmtree(output_dir)
+os.makedirs(output_dir)
+
+data = pd.read_csv("data/llava_data.csv")
+
+# select last 20 rows for testing
+data = data[:50]
+
+# data = data[1:10]  # Select only first 10 rows for testing
+# sort by country and then income
+data = data.sort_values(by=['country', 'income'], ascending=[True, True], ignore_index=True)
+
+class Go_WVS_Img_Dataset(Dataset):
+    def __init__(self, data):
+        self.img_id = data['image_id']
+        self.image_path = data['image_path']
+        self.country = data['country']
+        self.income = data['income']
+        self.question_text = data['question_text']
+        self.country_prompt = data['country_prompt']
+        self.generic_prompt = data['generic_prompt']
+        self.option_labels = data['option_labels']
+        self.full_options = data['full_options']
+        self.selection_answers = data['selection_answers']
 
 
+    def __len__(self):
+        return len(self.img_id) # number of samples
 
-def main(user_choice=False):
-    data_loader = DataLoader("Anthropic/llm_global_opinions", "data/dollarstreet/images_v2.csv")
-    questions, selections, unlabelled_options = data_loader.get_wvs_data()
-    unlabelled_options = [ast.literal_eval(each_sublabel.strip()) for each_sublabel in unlabelled_options]
-    # Process each sublist to add labels
-    letter_labeled_options = [
-        [f"({chr(65 + i)}) {option}" for i, option in enumerate(sublist)] for sublist in unlabelled_options
-        ]
-     # remove quotes from the options
-    labeled_options = [", ".join(sublist) for sublist in letter_labeled_options]
+    def __getitem__(self, idx):
+        return {
+            'img_id': self.img_id[idx],
+            'image_path': self.image_path[idx],
+            'country': self.country[idx],
+            'income': self.income[idx],
+            'question_text': self.question_text[idx],
+            'country_prompt': self.country_prompt[idx],
+            'generic_prompt': self.generic_prompt[idx],
+            'option_labels': self.option_labels[idx],
+            'full_options': self.full_options[idx],
+            'selection_answers': self.selection_answers[idx]
+        }
         
-    dollarstreet_data = data_loader.get_dollarstreet_data()
-
-    print(f"Number of samples in original dollarstreet data: {dollarstreet_data.shape[0]}")
-    print(f"Number of question in original WVS data: {len(questions)}")
-    print(f"Number of options in original WVS data: {len(labeled_options)}")
-
-    print(f"If we were to run the model on all samples, we would have {dollarstreet_data.shape[0] * len(questions)} samples to test.")
-
-    data_processor = DataProcessor(selections)
-    common_countries = data_processor.filter_common_countries(dollarstreet_data['country.name'].unique())
-
-    family_photo_income_data = data_processor.prepare_family_data(dollarstreet_data, common_countries)
-    family_data = family_photo_income_data.copy()
-    family_data.loc[:, 'imageFullPath'] = "data/dollarstreet/" + family_data['imageRelPath']
-
-    # Number of samples in filtered dollarstreet data in each common country
-    count_country_samples = family_data[family_data['country.name'].isin(common_countries)].groupby('country.name').size()
-    print(f"Filtered data each: \n{count_country_samples}")
-    print("*"*60)
+eval_dataset = Go_WVS_Img_Dataset(data)
+dataset_loader = DataLoader(eval_dataset, batch_size=8, shuffle=False, num_workers=1)
+model_path = "liuhaotian/llava-v1.5-7b"
 
 
-    print("*"*60)
-    print(f"Number of common countries in both datasets: {len(common_countries)}")
-    print(f"Total samples filtered dollarstreet data: {family_data.shape[0]} * {len(questions)} = {family_data.shape[0] * len(questions)}")
-    print("*"*60)
+def evaluate_model(prompts_batch, img_files_batch, letter_options, full_options):
+    args = type('Args', (), {
+        "model_path": model_path,
+        "model_base": None,
+        "model_name": get_model_name_from_path(model_path),
+        "query": prompts_batch,
+        "conv_mode": None,
+        "image_file": img_files_batch,
+        "sep": ",",
+        "temperature": 0,
+        "top_p": None,
+        "num_beams": 1,
+        "max_new_tokens": 512
+        })()
+    
+    batch_results = eval_model(args, prompts_batch, img_files_batch, letter_options, full_options)
+    return batch_results
 
-    # num_samples = int(input("How many samples do you want to process? (Default is all): ") or family_data.shape[0])
-    def_n_questions = len(questions) # Number of questions to process
-    # def_n_questions = 7 # Number of questions to process
+# Loop through the dataset and evaluate each batch
+results_dict = {}; combined_results = {}
+for i, batch in tdqm(enumerate(dataset_loader), total=len(dataset_loader)):
+    prompts_batch, img_files_batch, letter_options, full_options = batch['generic_prompt'], batch['image_path'], batch['option_labels'], batch['full_options']
 
-    # print(f"In default model -  We will process {num_samples} samples with {def_n_questions} questions.")
-    # print(f"Total data points to process: {num_samples * def_n_questions} in different combinations.")
+    # convert selection_answers to list of floats
+    batch['selection_answers'] = [ast.literal_eval(each_sublabel.strip()) for each_sublabel in batch['selection_answers']]
+    # Pass the batched data to the evaluation function
+    batch_results = evaluate_model(prompts_batch, img_files_batch, letter_options, full_options)
 
-    output_dir = "output_allimgs/"
-    # Delete directory if it exists and create a new one
-    # if os.path.exists(output_dir):
-    #     shutil.rmtree(output_dir)
-    # os.makedirs(output_dir)
+    # Store the results of batche values and batch results
+    batch_dict = {**batch, **batch_results}
 
-    if user_choice:
-        use_images = input("Do you want to use images? (Yes/No): ").strip().lower()
-        assert use_images in ["yes", "y", "no", "n"], "Invalid choice. Please enter Yes or No."
-        use_images = True if use_images in ["yes", "y"] else False
+    # Store the results of batch_dict in results_dict
+    for key, value in batch_dict.items():
+        if key not in results_dict:
+            results_dict[key] = []
+        results_dict[key].append(value)
 
-        use_country_name = input("Do you want to use country name in the prompt? (Yes/No): ").strip().lower() 
-        assert use_country_name in ["yes", "y", "no", "n"], "Invalid choice. Please enter Yes or No."
-        use_country_name = True if use_country_name in ["yes", "y"] else False
-
-        processor = LLAVAProcessor(family_data['imageFullPath'].tolist(), questions[:def_n_questions], selections[:def_n_questions], labeled_options)
-        processed_data = processor.process_data(family_data, use_images, use_country_name)
-
-        file_name = f'llava_output_img_{use_images}_country_{use_country_name}.csv'
-        file_path = os.path.join(output_dir, file_name)
-        processor.save_results(processed_data, file_path)
-        print(f"Processing complete. Results saved to {file_path}.")
-    else:
-        for use_images in [True]:
-            for use_country_name in [False]: # add True if needed
-                print("*"*60)
-                print(f"Combination: Images - {use_images}, Country Name - {use_country_name}")
-                processor = LLAVAProcessor(family_data['imageFullPath'].tolist(), questions[:def_n_questions], selections[:def_n_questions], labeled_options)
-                processed_data = processor.process_data(family_data, use_images, use_country_name, test=False)
-                
-                file_name = f'llava_img_{use_images}_country_{use_country_name}.csv'
-                file_path = os.path.join(output_dir, file_name)
-                processor.save_results(processed_data, file_path)
-                print(f"Processing complete. Results saved to {file_path}.")
-
-if __name__ == "__main__":
-    # count time it takes to process all combinations
-    start_time = time.time()
-    main(user_choice=False)  # Modify as needed for automated (False) or manual (True) execution
-    print(f"Total time taken: {time.time() - start_time} seconds.")
+# Combine the results of all batches
+from tqdm import tqdm
+for key, value in tqdm(results_dict.items()):
+    combined_results[key] = [item for sublist in value for item in sublist]
 
 
+# Save the results to a csv file
+combined_results_df = pd.DataFrame(combined_results)
+
+# Put 'selection_answers' in the right side of 'prob_percent_values'
+selection_answers = combined_results_df['selection_answers']
+prob_percent_values = combined_results_df['prob_percent_values']
+# move selection_answers to the right side of prob_percent_values
+combined_results_df.drop(columns=['selection_answers', 'prob_percent_values'], inplace=True)
+combined_results_df['prob_percent_values'] = prob_percent_values
+combined_results_df['selection_answers'] = selection_answers
+
+
+print(f"length of results_df: {len(combined_results_df)}")
+output_file = os.path.join(output_dir, "results.csv")
+# delete file if it exists
+if os.path.exists(output_file):
+    os.remove(output_file)
+combined_results_df.to_csv(os.path.join(output_dir, "results.csv"), index=False)
+
+end_time = time.time()
+print(f"Time taken: {end_time - start_time} seconds")
 
 
 

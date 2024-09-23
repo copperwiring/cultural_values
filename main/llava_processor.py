@@ -6,88 +6,8 @@ from tqdm import tqdm
 
 class LLAVAProcessor:
     def __init__(self, img_files_paths, wvs_questions, wvs_selection, wvs_options):
-        self.img_files_paths = sorted(img_files_paths)
-        self.wvs_questions = wvs_questions
-        self.wvs_options = wvs_options
-        self.wvs_selection = wvs_selection
+
         self.model_path = "liuhaotian/llava-v1.5-7b"
-
-
-    def make_prompt(self, n, country_name=None):
-        if country_name:
-            prompt = f"""How would someone from {country_name}  answer the following question: {self.wvs_questions[n]} \n
-                        Here are the options: \n
-                        {self.wvs_options[n]} \n
-                        ASSISTANT: If had to select one of the options, my answer would be"""
-        else:
-            prompt = f"""{self.wvs_questions[n]} \n
-                    Here are the options: \n
-                    {self.wvs_options[n]} \n
-                    ASSISTANT: If had to select one of the options, my answer would be"""
-            
-        option_letter = re.findall(r'\((.)\)', self.wvs_options[n])
-        return prompt, option_letter, self.wvs_options[n]
-
-    # Instread of processing data with number of files, we should do for each country in the selection
-    # Reason, we want to pass images based on country name.
-    # We have questions and options for each country, so we can pass them as well.
-    def process_data(self, image_data, use_images, use_country_name, test=True):
-        data = []
-        print("test", test)
-        questions = self.wvs_questions[:2] if test else self.wvs_questions
-        for n in tqdm(range(len(questions))):
-
-            # # TO CHECK:
-            # UPDATE COUNTRIES TO PROCESS BECAUSE WE DONT NEED ALL DOLLARSTREET COUNTRIES FOR ALL QUESTIONS
-            # IT DEPENDS ON THE QUESTION
-            self.wvs_selection[n] = eval(self.wvs_selection[n].replace("defaultdict(<class 'list'>, ", "").rstrip(")")) \
-                                                    if "defaultdict" in self.wvs_selection[n] \
-                                                    else self.wvs_selection[n]
-        
-            # find all countries in the selection from image_data which are in the selection
-            dollar_street_countries = image_data['country.name'].unique() 
-            countries_to_process = [country for country in dollar_street_countries if country in self.wvs_selection[n]]
-            # countries_to_process = dollar_street_country in self.wvs_selection[n]  
-
-            # if not countries_to_process:
-            #     continue
-            for dollar_street_country in countries_to_process:
-                all_file_paths = image_data[image_data['country.name'] == dollar_street_country]['imageFullPath'].values
-                all_image_ids = image_data[image_data['country.name'] == dollar_street_country]['id'].values
-               
-                for each_img_file_path, each_image_id in zip(all_file_paths, all_image_ids):
-                    img_file_path = each_img_file_path if use_images else None
-                    image_id = each_image_id 
-
-                    # img_file_path = image_data[image_data['country.name'] == dollar_street_country]['imageFullPath'].values[0] if use_images else None
-                    # image_id = image_data[image_data['country.name'] == dollar_street_country]['id'].values[0] if use_images else None
-
-                    wvs_country_distribution = self.wvs_selection[n][dollar_street_country]
-
-                    ques_id = n # this is the index of the question
-
-                    prompt, letter_options, full_options = self.make_prompt(n, dollar_street_country) if use_country_name else self.make_prompt(n)
-                    options, token_prob_options, prob_percent, top10_token_prob = self.evaluate_model(prompt, \
-                                                                                                        img_file_path, \
-                                                                                                        letter_options, \
-                                                                                                        full_options)
-                    # self.print_ranked_options(sorted_token_prob_options, options)
-                    # self.print_ranked_options(sorted_underscore_token_prob_options, options_with_underscore)
-                    result = [options, token_prob_options, prob_percent, top10_token_prob]
-
-                    # norm_prob_options is a dictionary with options as keys and probabilities as values in a tensor e.g {'A': tensor(0.3, device='cuda:0')}
-                    result_prob_option_dict = {token: prob.item() for token, prob in token_prob_options}
-                    result_prob_percent_dict = prob_percent
-                    result_formatted = self.format_result(ques_id, self.wvs_questions[n], 
-                                                    image_id, dollar_street_country, 
-                                                    use_images, use_country_name, img_file_path, 
-                                                    top10_token_prob,
-                                                    result_prob_percent_dict,
-                                                    result_prob_option_dict,
-                                                    wvs_country_distribution,
-                                                    prompt)
-                    data.append(result_formatted)
-        return data
 
     def evaluate_model(self, prompt, img_file, letter_options, full_option):
         args = type('Args', (), {
@@ -105,6 +25,28 @@ class LLAVAProcessor:
             })()
         self.result = eval_model(args, letter_options, full_option)
         return self.result
+    
+    def process_data(self, image_data, use_images, use_country_name, test=True):
+
+        options, token_prob_options, prob_percent, top10_token_prob = self.evaluate_model(prompt,img_file_path, letter_options, full_options)
+
+        result = [options, token_prob_options, prob_percent, top10_token_prob]
+
+        # norm_prob_options is a dictionary with options as keys and probabilities as values in a tensor e.g {'A': tensor(0.3, device='cuda:0')}
+        result_prob_option_dict = {token: prob.item() for token, prob in token_prob_options}
+        result_prob_percent_dict = prob_percent
+        result_formatted = self.format_result(ques_id, self.wvs_questions[n], 
+                                        image_id, dollar_street_country, 
+                                        use_images, use_country_name, img_file_path, 
+                                        top10_token_prob,
+                                        result_prob_percent_dict,
+                                        result_prob_option_dict,
+                                        wvs_country_distribution,
+                                        prompt)
+        data.append(result_formatted)
+        return data
+
+
 
     def format_result(self, ques_idx, question, image_id, country, use_images,\
                     use_country_name, img_path, \

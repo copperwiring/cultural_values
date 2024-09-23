@@ -3,7 +3,7 @@ import ast
 from datasets import load_dataset
 from collections import defaultdict
 
-class DataLoader:
+class LoadGoDollarstreetData:
     def __init__(self, go_dataset_path, dollarstreet_csv_path):
         self.go_dataset = load_dataset(go_dataset_path)
         self.dollarstreet_data = pd.read_csv(dollarstreet_csv_path)
@@ -37,6 +37,7 @@ class DataProcessor:
         return dollarstreet_data[
             dollarstreet_data['topics'].isin(['Family', 'Family snapshots']) &
             dollarstreet_data['country.name'].isin(common_countries) &
-            dollarstreet_data['type'].isin(['image'])
+            dollarstreet_data['type'].isin(['image']) &
+            dollarstreet_data['income']
         ]
 

@@ -287,12 +287,16 @@ class LlavaMetaForCausalLM(ABC):
 
         for i, (cur_new_embed, cur_new_labels) in enumerate(zip(new_input_embeds, new_labels)):
             cur_len = cur_new_embed.shape[0]
-            if getattr(self.config, 'tokenizer_padding_side', 'right') == "left":
+            
+            # CHECK THIS LATER
+            self.config.tokenizer_padding_side = "left"
+            # if getattr(self.config, 'tokenizer_padding_side', 'left') == "left": 
+            if getattr(self.config, 'tokenizer_padding_side', 'right') == "left": 
                 new_input_embeds_padded.append(torch.cat((
                     torch.zeros((max_len - cur_len, cur_new_embed.shape[1]), dtype=cur_new_embed.dtype, device=cur_new_embed.device),
                     cur_new_embed
                 ), dim=0))
-                if cur_len > 0:
+                if cur_len > 0: 
                     new_labels_padded[i, -cur_len:] = cur_new_labels
                     attention_mask[i, -cur_len:] = True
                     position_ids[i, -cur_len:] = torch.arange(0, cur_len, dtype=position_ids.dtype, device=position_ids.device)

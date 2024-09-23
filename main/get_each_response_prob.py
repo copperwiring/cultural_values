@@ -183,29 +183,31 @@ if __name__ == '__main__':
     sub_dir = sub_dir_list[randm_num]
     sub_dir_path = os.path.join(base_dir, sub_dir)
     
-    image_file_ds = "data/dollarstreet/assets/5d4bde20cf0b3a0f3f3359f7/5d4bde20cf0b3a0f3f3359f7.jpg"
-    prompt_ds = """How satisfied are you with the following? \n\n
-    The way the local authorities are solving the region’s affairs \n\n                    
+    image_file_ds = "https://www.foreigner.bg/wp-content/uploads/2021/01/family-1827369_640.jpg"
+    prompt_ds = """This is a photo of people of which country? \n\n                    
     Here are the options: \n\n                    
-    [A. Completely dissatisfied, 
-    B. Rather dissatisfied, 
-    C. Rather satisfied, 
-    D. Completely satisfied, 
-    E. Don\'t know, 
-    F. No answer
-    G. Invalid option] \n\n
+    [(A) Serbia, 
+    (B) Sweden, 
+    (C) Romania, 
+    (D) Bulgaria, 
+    (E) Istanbul
+    ] \n\n
     ASSISTANT: If had to select one of the options, my answer would be"""
 
+    # exclude 'F' and 'G' options which are No answer and Invalid option
 
-    options_ds = ['A', 'B', 'C', 'D', 'E', 'F', 'G']
+    # options_ds = ['A', 'B', 'C', 'D', 'E', 'F', 'G']
+    options_ds = ['A', 'B', 'C', 'D', 'E']
+
     # options_ds = ['Completely dissatisfied', 'Rather dissatisfied', 'Rather satisfied', 'Completely satisfied', 'Don\'t know', 'No answer', 'Invalid option']
     options_ds = sorted(options_ds)
 
     # -----------------------------------------
     # image_file = "https://cdn.pixabay.com/photo/2023/08/18/15/02/dog-8198719_640.jpg"
-    image_file = "https://images.twinkl.co.uk/tw1n/image/private/t_630/u/ux/pc_ver_1.png"
+    image_file = "https://i0.wp.com/big-family-small-world.com/wp-content/uploads/2018/10/family-shot-sofia-roman-walls-1-1024x991.jpg?ssl=1"
+    # image_file = "https://st4.depositphotos.com/1005381/30046/i/450/depositphotos_300467142-stock-photo-girls-dressed-folk-costumes-church.jpg"
     # image_file = "https://llava-vl.github.io/static/images/view.jpg"
-    prompt = """This is the photo of a :\n\n"""
+    prompt = """This is a family photo of :\n\n"""
     options = ["dog", "animal", "computer", "river", "▁computer", "▁Computer"]
     options = sorted(options)
     
