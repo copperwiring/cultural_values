@@ -2,10 +2,10 @@ import ast, os, time
 import pandas as pd
 from typing import List, Dict
 
-from create_dataset.data_extractor import LoadGoDollarstreetData, DataProcessor
+from data_extractor import LoadGoDollarstreetData, DataProcessor
 # from models.llavamodel.llava.llava.mm_utils import get_model_name_from_path
 # from models.llavamodel.llava.llava.eval.run_llava import eval_model
-from create_dataset.dataset_processor import DatasetCreator
+from dataset_processor import DatasetCreator
 
 
 def main() -> None:
@@ -17,9 +17,11 @@ def main() -> None:
         None
     """
     # Define the data folder path
-    data_folder: str = "data"
+    
+    # CHECK THIS PATH
+    data_folder: str = "/projects/belongielab/people/vsl333/ds"
 
-    data_loader = LoadGoDollarstreetData("Anthropic/llm_global_opinions", f"{data_folder}/dollarstreet/images_v2.csv")
+    data_loader = LoadGoDollarstreetData("Anthropic/llm_global_opinions", f"{data_folder}/data/images_v2.csv")
     # Get WVS questions, selections, and options
     questions: List[str]
     selections: List[str]
@@ -79,7 +81,7 @@ def main() -> None:
     # Output the number of samples in the final DataFrame
     print(f"Number of samples in dataframe: {df.shape[0]}")
 
-    csv_file_name = f"{data_folder}/llava_data.csv"
+    csv_file_name = f"{data_folder}/wvs_ds_people_data.csv"
 
     # delete file if it exists
     if os.path.exists(csv_file_name):

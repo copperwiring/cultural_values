@@ -4,14 +4,20 @@ from PIL import Image
 import os
 import io
 from tqdm import tqdm
+import logging
+
+# Configure logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
+
 
 # Load the dataset
 dataset = load_dataset('afaji/cvqa')
 
 # Define the path to save the images and CSV file
-base_dir = "data/cvqa/"
-image_save_path = os.path.join(base_dir, "images/")
-csv_save_path = os.path.join(base_dir, "metadata.csv")
+output_dir = "/projects/belongielab/people/vsl333/cvqa"
+image_save_path = os.path.join(output_dir, "images/")
+csv_save_path = os.path.join(output_dir, "metadata.csv")
 
 # Create directories if they do not exist
 if not os.path.exists(image_save_path):
@@ -20,6 +26,7 @@ if not os.path.exists(image_save_path):
 # List to store the rows for the CSV file
 csv_rows = []
 
+logging.info("Saving images and metadata to disk...")
 # Iterate through the test dataset
 for i, row in enumerate(tqdm(dataset['test'])):
     image_data = row['image']
@@ -60,3 +67,5 @@ df.to_csv(csv_save_path, index=False)
 
 print(f"Images saved in {image_save_path}")
 print(f"CSV metadata saved at {csv_save_path}")
+
+logging.info("Images and metadata saved successfully!")
