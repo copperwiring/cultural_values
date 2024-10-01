@@ -106,7 +106,7 @@ def right_pad_sequence_to_max_length(sequence, max_length, padding_value=0):
 def eval_model(args, prompts_batch, img_files_batch=None, letter_options=None, full_options=None):
 
     model_name = get_model_name_from_path(args.model_path)
-    tokenizer, model, image_processor, context_len = load_pretrained_model(args.model_path, args.model_base, model_name)
+    tokenizer, model, image_processor, context_len = load_pretrained_model(args.model_path, args.model_base, model_name, offload_folder="offload")
 
     # qs = get_prompt(args, model)
 
@@ -157,6 +157,8 @@ def eval_model(args, prompts_batch, img_files_batch=None, letter_options=None, f
     max_len = max([len(tokenized_prompt.squeeze()) for tokenized_prompt in tokenized_prompts])
 
     # Pad the input_ids to the maximum length
+    device = model.device if torch.cuda.is_available() else "cpu"
+    print(f"Device: {device}")
     padded_tokenized_ids= [left_pad_sequence_to_max_length(tokenized_prompt.squeeze(), max_len) for tokenized_prompt in tokenized_prompts]
     batched_input_ids = torch.stack(padded_tokenized_ids).to(model.device)
 

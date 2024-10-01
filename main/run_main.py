@@ -1,12 +1,18 @@
-import os, shutil, time, logging, ast
+import os, shutil, time, logging, ast, sys
 import pandas as pd
 from tqdm import tqdm as tdqm
 from torch.utils.data import Dataset, DataLoader
+
+# sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
 logging.disable(logging.CRITICAL)  # Disables all logging calls of severity 'CRITICAL' and below
 from models.llavamodel.llava.llava.mm_utils import get_model_name_from_path
 from models.llavamodel.llava.llava.eval.run_llava import eval_model
 
+# import pdb; pdb.set_trace()
 start_time = time.time()
+
+logging.info("Creating output directory")
 
 output_dir = "output_results"
 # Delete directory if it exists and create a new one
@@ -14,10 +20,13 @@ if os.path.exists(output_dir):
     shutil.rmtree(output_dir)
 os.makedirs(output_dir)
 
-data = pd.read_csv("data/llava_data.csv")
+logging.info("Reading data from csv file")
+
+base_data_dir = "/projects/belongielab/people/vsl333/ds"
+data = pd.read_csv(f"{base_data_dir}/wvs_ds_people_data.csv")
 
 # select last 20 rows for testing
-data = data[:50]
+data = data[:4]
 
 # data = data[1:10]  # Select only first 10 rows for testing
 # sort by country and then income
