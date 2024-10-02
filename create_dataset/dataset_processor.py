@@ -5,19 +5,17 @@ import pandas as pd
 import pandas as pd
 
 class DatasetCreator:
-    def __init__(self, img_paths: List[str], income_data: List[float], wvs_questions: List[str], wvs_selection: List[str], wvs_options: List[str]) -> None:
+    def __init__(self, img_paths: List[str], wvs_questions: List[str], wvs_selection: List[str], wvs_options: List[str]) -> None:
         """
         Initializes the DatasetCreator class with necessary data for processing.
 
         Args:
             img_paths (List[str]): Sorted list of image file paths.
-            income_data (List[float]): List of income data corresponding to the images.
             wvs_questions (List[str]): List of World Values Survey (WVS) questions.
             wvs_selection (List[str]): Country-specific selection data for WVS responses.
             wvs_options (List[str]): List of options available for each WVS question.
         """
         self.img_paths = sorted(img_paths)
-        self.income_data = income_data
         self.wvs_questions = wvs_questions
         self.wvs_selection = wvs_selection
         self.wvs_options = wvs_options
@@ -69,22 +67,20 @@ class DatasetCreator:
             List[Dict[str, Any]]: Updated dataset with image details, prompts, and options for each image in the country.
         """
         # Filter image data for the given country
-        country_image_data = image_data[image_data['country.name'] == country]
-        image_paths: List[str] = country_image_data['imageFullPath'].values
+        country_image_data = image_data[image_data['country.name'] == country] if 'country.name' in image_data.columns else image_data[image_data['country'] == country]
+        image_paths: List[str] = country_image_data['imageFullPath'].values if 'imageFullPath' in country_image_data.columns else country_image_data['image_path'].values
         image_ids: List[int] = country_image_data['id'].values
-        incomes: List[float] = country_image_data['income'].values
         selection_answers: List[float] = wvs_selections
 
         # Generate prompts for this question and country
         question_text, country_prompt, generic_prompt, option_labels, full_options = self.create_prompt(question_idx, country)
 
         # Append data for each image in the country
-        for img_path, img_id, income in zip(image_paths, image_ids, incomes):
+        for img_path, img_id in zip(image_paths, image_ids):
             dataset.append({
-                "image_id": img_id,
+                "id": img_id,
                 "image_path": img_path,
                 "country": country,
-                "income": income,
                 "question_text": question_text,
                 "country_prompt": country_prompt,
                 "generic_prompt": generic_prompt,
@@ -100,7 +96,7 @@ class DatasetCreator:
         Creates the full dataset by associating images with corresponding prompts and options.
 
         Args:
-            image_data (pd.DataFrame): DataFrame containing image information including country names, image paths, and income data.
+            image_data (pd.DataFrame): DataFrame containing image information including country names, image paths
 
         Returns:
             List[Dict[str, Any]]: The dataset containing image details, prompts, and options for each image.
@@ -115,7 +111,8 @@ class DatasetCreator:
             ) if "defaultdict" in self.wvs_selection[question_idx] else self.wvs_selection[question_idx]
 
             # Get unique countries in image data and filter by those in the current WVS selection
-            available_countries: List[str] = image_data['country.name'].unique()
+            # available_countries list is either 'country.name' or 'country' depending on the dataset
+            available_countries: List[str] = image_data['country.name'].unique() if 'country.name' in image_data.columns else image_data['country'].unique()
             countries_to_process: List[str] = [country for country in available_countries if country in self.wvs_selection[question_idx]]
 
             # Process each country for the current question
