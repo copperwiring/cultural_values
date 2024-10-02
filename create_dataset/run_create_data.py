@@ -2,6 +2,7 @@ import ast, os, time
 import pandas as pd
 import shutil
 from typing import List, Dict
+from pathlib import Path
 
 from data_extractor import LoadGoDollarstreetCVQAData, DataExtractor
 # from models.llavamodel.llava.llava.mm_utils import get_model_name_from_path
@@ -21,8 +22,9 @@ def main() -> None:
     
     # CHECK THIS PATH
     ds_data_folder: str = "/projects/belongielab/people/vsl333/ds"
+    root_dir = "/home/vsl333/cultural_values"
     cvqa_data_folder: str = "cvqa_chosen"
-    created_csv_data_dir: str = "../created_csv_data"
+    created_csv_data_dir: str = Path(f"{root_dir}/created_csv_data")
     if os.path.exists(created_csv_data_dir):
         shutil.rmtree(created_csv_data_dir)
     os.makedirs(created_csv_data_dir)
@@ -113,21 +115,23 @@ def main() -> None:
             df = pd.merge(df, ds_country_data[['id', 'income']], on='id', how='left')
             csv_file_name = f"{created_csv_data_dir}/ds_people.csv"
             print(f"Saving to {csv_file_name}")
+            if os.path.exists(csv_file_name):
+                os.remove(csv_file_name)
+            df.to_csv(csv_file_name, index=False)
+            print(f"Saved to {csv_file_name}")
 
         elif each_country_data["image_code"].unique() == "cvqa":
             print(f"Number of samples in dataframe: {df.shape[0]}")
             df["image_code"] = "cvqa"
             country_name = df['country'].unique()[0]   
-            csv_file_name = f"{created_csv_data_dir}/'cvqa_{country_name}.csv"
+            csv_file_name = f"{created_csv_data_dir}/cvqa_{country_name}.csv"
             print(f"Saving to {csv_file_name}")
+            if os.path.exists(csv_file_name):
+                os.remove(csv_file_name)
+            df.to_csv(csv_file_name, index=False)
+            print(f"Saved to {csv_file_name}")
         else:
             raise ValueError("Image code not recognized. Please check the image_code column in the dataframe.")
-
-
-        # delete file if it exists
-        # if os.path.exists(csv_file_name):
-        #     os.remove(csv_file_name)
-        # df.to_csv(csv_file_name, index=False)
 
 if __name__ == "__main__":
     start_time = time.time()
