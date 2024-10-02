@@ -2,7 +2,7 @@ import ast, os, time
 import pandas as pd
 from typing import List, Dict
 
-from data_extractor import LoadGoDollarstreetData, DataProcessor
+from data_extractor import LoadGoDollarstreetCVQAData, DataExtractor
 # from models.llavamodel.llava.llava.mm_utils import get_model_name_from_path
 # from models.llavamodel.llava.llava.eval.run_llava import eval_model
 from dataset_processor import DatasetCreator
@@ -19,9 +19,10 @@ def main() -> None:
     # Define the data folder path
     
     # CHECK THIS PATH
-    data_folder: str = "/projects/belongielab/people/vsl333/ds"
-
-    data_loader = LoadGoDollarstreetData("Anthropic/llm_global_opinions", f"{data_folder}/data/images_v2.csv")
+    ds_data_folder: str = "/projects/belongielab/people/vsl333/ds"
+    cvqa_data_folder: str = "cvqa_chosen"
+    data_loader = LoadGoDollarstreetCVQAData("Anthropic/llm_global_opinions", f"{ds_data_folder}/dollarstreet/images_v2.csv", f"{cvqa_data_folder}/metadata.csv")
+    
     # Get WVS questions, selections, and options
     questions: List[str]
     selections: List[str]
@@ -40,27 +41,33 @@ def main() -> None:
     labeled_options: List[str] = [", ".join(sublist) for sublist in letter_labeled_options]
 
     # Initialize the data processor for country selections
-    data_processor = DataProcessor(selections)
+    data_extractor = DataExtractor(selections)
 
     # Load the DollarStreet data
     dollarstreet_data = data_loader.get_dollarstreet_data()
+    cvqa_data = data_loader.get_cvqa_data()
+
 
     # Get the list of common countries between WVS data and DollarStreet data
-    common_countries: List[str] = data_processor.filter_common_countries(dollarstreet_data['country.name'].unique())
+    common_countries: List[str] = data_extractor.filter_common_countries(dollarstreet_data['country.name'].unique(), cvqa_data['country'].unique())
+
 
     # Prepare family data with photo paths and income information for the common countries
-    family_photo_income_data = data_processor.prepare_family_data(dollarstreet_data, common_countries)
+    family_photo_income_data = data_extractor.prepare_ds_family_data(dollarstreet_data, common_countries)
+    csv_file_name = data_extractor.prepare_cvqs_img_data(cvqa_data, common_countries)
 
+    breakpoint()
     # Create a copy of the family data
     family_data = family_photo_income_data.copy()
 
     # Add full image paths by concatenating folder path with relative image path
-    family_data.loc[:, 'imageFullPath'] = f"{data_folder}/dollarstreet/" + family_data['imageRelPath']
+    family_data.loc[:, 'imageFullPath'] = f"{ds_data_folder}/dollarstreet/" + family_data['imageRelPath']
 
     # Get the number of questions to process
     def_n_questions: int = len(questions)
 
     # Initialize the dataset processor with image paths, income, questions, selections, and options
+    # TO DO: Add income later
     processor = DatasetCreator(
         family_data['imageFullPath'].tolist(),            # Image paths
         dollarstreet_data['income'],                      # Income data
