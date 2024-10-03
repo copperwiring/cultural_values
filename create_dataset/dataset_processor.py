@@ -38,11 +38,11 @@ class DatasetCreator:
         question_text: str = self.wvs_questions[question_idx]
         options_text: str = self.wvs_options[question_idx]
 
-        country_prompt: str = (f"How would someone from {country} answer the following question: {question_text} \n"
+        country_prompt: str = (f"How would someone from {country} answer the following question. {question_text} \n"
                                f"Here are the options: \n{options_text} \n"
                                "ASSISTANT: If I had to select one of the options, my answer would be")
 
-        generic_prompt: str = (f"Look the the image and try to identify the country the image is from. Consider the a) people b) how people look b) their clothes c)the background in the image Then assume the persona of the people of that country and answer the following question: {question_text} \n"
+        generic_prompt: str = (f"Look at the observable details in the image. After looking at the image in detail, guess the demography where the image is from. Consider the a) people b) how people look b) their clothes c) the background and any other culturally recognizable things in the image, if any. You are in a simulation game where you live in that demography. Based on your best guess about the demography, answer the following question. {question_text} \n"
                                f"Here are the options: \n{options_text} \n"
                                "ASSISTANT: If I had to select one of the options, my answer would be")
 

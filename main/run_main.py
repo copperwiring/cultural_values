@@ -21,7 +21,7 @@ class Go_WVS_Img_Dataset(Dataset):
         self.image_path = data['image_path']
         self.country = data['country']
         self.image_code = data['image_code']
-        self.income = data['income'] if 'income' in data.columns else None
+        self.income = data['income'] if 'income' in data.columns else "N"
         self.question_text = data['question_text']
         self.country_prompt = data['country_prompt']
         self.generic_prompt = data['generic_prompt']
@@ -39,7 +39,7 @@ class Go_WVS_Img_Dataset(Dataset):
             'image_path': self.image_path[idx],
             'country': self.country[idx],
             'image_code': self.image_code[idx],
-            'income': self.income[idx] if self.income is not None else None,
+            'income': self.income[idx] if hasattr(self, 'income') and idx < len(self.income) else "N",
             'question_text': self.question_text[idx],
             'country_prompt': self.country_prompt[idx],
             'generic_prompt': self.generic_prompt[idx],
@@ -57,7 +57,8 @@ class DatasetManager:
 
     def get_dataloader(self):
         eval_dataset = Go_WVS_Img_Dataset(self.data)
-        return DataLoader(eval_dataset, batch_size=self.batch_size, shuffle=self.shuffle, num_workers=self.num_workers)
+        batch_data = DataLoader(eval_dataset, batch_size=self.batch_size, shuffle=self.shuffle, num_workers=self.num_workers)
+        return batch_data
 
 class ModelEvaluator:
     def __init__(self, model_path, dataloader):
@@ -127,7 +128,7 @@ class ModelEvaluator:
         combined_results_df['selection_answers'] = selection_answers
 
         print(f"Length of results_df: {len(combined_results_df)}")
-        output_file = os.path.join(output_dir, f"{csv_file_name}_results.csv")
+        output_file = os.path.join(output_dir, f"{csv_file_name.split('.')[0]}_results.csv")
         
         # Delete file if it exists
         if os.path.exists(output_file):
@@ -139,7 +140,7 @@ def main(csv_file_path, model_path, output_dir, batch_size, num_workers):
     start_time = time.time()
 
     data = pd.read_csv(csv_file_path)
-    data = data[:4]  # select last n rows for testing
+    # data = data[:4]  # select last n rows for testing
     data = data.sort_values(by=['country'], ascending=[True], ignore_index=True)
     # Initialize Dataset Manager
     dataset_manager = DatasetManager(data, batch_size=batch_size, num_workers=num_workers)

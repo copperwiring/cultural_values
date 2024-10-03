@@ -105,7 +105,6 @@ def main() -> None:
         # Sort the DataFrame by country
         df = df.sort_values(by=['country'], ascending=[True], ignore_index=True)
 
-        
         if each_country_data["image_code"].unique() == "ds":
             print(f"Number of samples in dataframe: {df.shape[0]}")
             df["image_code"] = "ds"
@@ -123,6 +122,9 @@ def main() -> None:
         elif each_country_data["image_code"].unique() == "cvqa":
             print(f"Number of samples in dataframe: {df.shape[0]}")
             df["image_code"] = "cvqa"
+            # add category, language column back to df from each_country_data for same id
+            df = pd.merge(df, each_country_data[['id', 'category', 'language']], on='id', how='left')
+
             country_name = df['country'].unique()[0]   
             csv_file_name = f"{created_csv_data_dir}/cvqa_{country_name}.csv"
             print(f"Saving to {csv_file_name}")
