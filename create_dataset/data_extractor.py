@@ -4,10 +4,12 @@ from datasets import load_dataset
 from collections import defaultdict
 
 class LoadGoDollarstreetCVQAData:
-    def __init__(self, go_dataset_path, dollarstreet_csv_path, cvqa_csv_path):
+    def __init__(self, go_dataset_path, image_dir, dollarstreet_csv_path = None, cvqa_csv_path = None):
         self.go_dataset = load_dataset(go_dataset_path)
-        self.dollarstreet_data = pd.read_csv(dollarstreet_csv_path)
-        self.cvqa_data = pd.read_csv(cvqa_csv_path)
+        self.image_dir = image_dir
+        self.dollarstreet_data = pd.read_csv(dollarstreet_csv_path) if dollarstreet_csv_path is not None else None
+        self.cvqa_data = pd.read_csv(cvqa_csv_path) if cvqa_csv_path is not None else None
+
 
     def get_wvs_data(self):
         train_data = self.go_dataset['train']
@@ -37,8 +39,13 @@ class DataExtractor:
             countries.extend(each_response.keys())
         return list(set(countries))
 
-    def filter_common_countries(self, dollarstreet_countries, cvqa_countries):
-        return list(set(self.wvs_countries).intersection(set(dollarstreet_countries)).intersection(set(cvqa_countries)))
+    def filter_common_countries(self, dollarstreet_countries = None, cvqa_countries = None):
+        # Get the common countries between WVS and DollarStreet data/cvqa data which is not none
+        if dollarstreet_countries is not None:
+            common_countries = list(set(dollarstreet_countries).intersection(self.wvs_countries))
+        elif cvqa_countries is not None:
+            common_countries = list(set(cvqa_countries).intersection(self.wvs_countries))
+        return common_countries
 
     # Note we only cosnider the family data for images
     def prepare_ds_family_data(self, dollarstreet_data, common_countries):

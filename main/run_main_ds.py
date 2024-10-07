@@ -4,6 +4,7 @@ import pandas as pd
 from torch.utils.data import Dataset, DataLoader
 import argparse
 from tqdm import tqdm
+from pathlib import Path
 
 # sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
@@ -13,10 +14,6 @@ from models.llavamodel.llava.llava.eval.run_llava import eval_model
 
 
 logging.info("Creating output directory")
-# True - country persona (with country names in prompt - no images)
-# False -  generic persona (images as a proxy for country)
-country_persona = True
-print("country persona", country_persona)  
 
 class Go_WVS_Img_Dataset(Dataset):
     def __init__(self, data):
@@ -64,12 +61,13 @@ class DatasetManager:
         return batch_data
 
 class ModelEvaluator:
-    def __init__(self, model_path, dataloader):
+    def __init__(self, model_path, dataloader, country_persona):
         self.model_path = model_path
         self.dataloader = dataloader
         self.results_dict = {}
         self.combined_results = {}
         self.model_path = model_path
+        self.country_persona = country_persona
 
     def evaluate_model(self, prompts_batch, img_files_batch, letter_options, full_options):
         args = type('Args', (), {
@@ -95,10 +93,12 @@ class ModelEvaluator:
             prompts_batch = batch['generic_prompt']
             img_files_batch = batch['image_path']
             
-            if country_persona:
+            print("persona True/False", self.country_persona)
+            if self.country_persona:
+                print(f'Since country_persona is True, using country_prompt')
                 prompts_batch = batch['country_prompt']
                 img_files_batch = None
-            print("persona true or false", country_persona)
+            
             letter_options = batch['option_labels']
             full_options = batch['full_options']
             
@@ -136,7 +136,7 @@ class ModelEvaluator:
         combined_results_df['selection_answers'] = selection_answers
 
         print(f"Length of results_df: {len(combined_results_df)}")
-        output_file = os.path.join(output_dir, f"{csv_file_name.split('.')[0]}_{country_persona}_results_a40.csv")
+        output_file = os.path.join(output_dir, f"{csv_file_name.split('.')[0]}_test_{self.country_persona}_results.csv")
         
         # Delete file if it exists
         if os.path.exists(output_file):
@@ -144,18 +144,19 @@ class ModelEvaluator:
             
         combined_results_df.to_csv(output_file, index=False)
 
-def main(csv_file_path, model_path, output_dir, batch_size, num_workers):
+def main(csv_file_path, model_path, output_dir, batch_size, num_workers, country_persona):
     start_time = time.time()
 
     data = pd.read_csv(csv_file_path)
-    # data = data[:4]  # select last n rows for testing
+
+    data = data[:2]  # select last n rows for testing
     data = data.sort_values(by=['country'], ascending=[True], ignore_index=True)
     # Initialize Dataset Manager
     dataset_manager = DatasetManager(data, batch_size=batch_size, num_workers=num_workers)
     dataloader = dataset_manager.get_dataloader()
 
     # Initialize Model Evaluator
-    evaluator = ModelEvaluator(model_path, dataloader)
+    evaluator = ModelEvaluator(model_path, dataloader, country_persona)
 
     # Evaluate batches and save results
     evaluator.evaluate_batches()
@@ -174,6 +175,7 @@ if __name__ == "__main__":
     parser.add_argument('--output_dir', type=str, help='Path to the output directory')
     parser.add_argument('--batch_size', type=int, default=8, help='Batch size for evaluation')
     parser.add_argument('--num_workers', type=int, default=1, help='Number of workers for dataloader')
+    parser.add_argument('--country_persona', type=lambda x: x.lower() == 'true', default=True, help='True - country persona, False - generic persona')
 
     # e.g. 
     
@@ -182,9 +184,9 @@ if __name__ == "__main__":
     output_dir = args.output_dir
     csv_file_path = args.csv_file_path
 
-
+    print(f"Persona: {args.country_persona}")
     # Call the main function
-    main(csv_file_path, model_path, output_dir, args.batch_size, args.num_workers)
+    main(csv_file_path, model_path, output_dir, args.batch_size, args.num_workers, args.country_persona)
 
     # TO DO:
     # Right now data gets saved in the end, but we can save it after each batch is evaluated
