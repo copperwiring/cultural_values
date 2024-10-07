@@ -5,6 +5,7 @@ from torch.utils.data import Dataset, DataLoader
 import argparse
 from tqdm import tqdm
 from pathlib import Path
+from models.llavamodel.llava.llava.model.builder import load_pretrained_model
 
 # sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
@@ -66,14 +67,13 @@ class ModelEvaluator:
         self.dataloader = dataloader
         self.results_dict = {}
         self.combined_results = {}
-        self.model_path = model_path
         self.country_persona = country_persona
 
-    def evaluate_model(self, prompts_batch, img_files_batch, letter_options, full_options):
+    def evaluate_model(self, prompts_batch, img_files_batch, letter_options, full_options, tokenizer, model, image_processor, model_name):
         args = type('Args', (), {
-            "model_path": model_path,
+            "model_path": self.model_path,
             "model_base": None,
-            "model_name": get_model_name_from_path(model_path),
+            "model_name": model_name,
             "query": prompts_batch,
             "conv_mode": None,
             "image_file": img_files_batch,
@@ -83,11 +83,11 @@ class ModelEvaluator:
             "num_beams": 1,
             "max_new_tokens": 512
             })()
-    
-        batch_results = eval_model(args, prompts_batch, img_files_batch, letter_options, full_options)
+
+        batch_results = eval_model(args, prompts_batch, img_files_batch, letter_options, full_options, tokenizer, model, image_processor, model_name)
         return batch_results
 
-    def evaluate_batches(self):
+    def evaluate_batches(self, tokenizer, model, image_processor, model_name):
         # Loop through the dataset and evaluate each batch
         for i, batch in tqdm(enumerate(self.dataloader), total=len(self.dataloader)):
             prompts_batch = batch['generic_prompt']
@@ -106,7 +106,7 @@ class ModelEvaluator:
             batch['selection_answers'] = [ast.literal_eval(each_sublabel.strip()) for each_sublabel in batch['selection_answers']]
             
             # Pass the batched data to the evaluation function
-            batch_results = self.evaluate_model(prompts_batch, img_files_batch, letter_options, full_options)
+            batch_results = self.evaluate_model(prompts_batch, img_files_batch, letter_options, full_options, tokenizer, model, image_processor, model_name)
             
             # Store the results of batched values and batch results
             batch_dict = {**batch, **batch_results}
@@ -144,22 +144,29 @@ class ModelEvaluator:
             
         combined_results_df.to_csv(output_file, index=False)
 
-def main(csv_file_path, model_path, output_dir, batch_size, num_workers, country_persona):
+def main(csv_file_path, model_path, output_dir, batch_size, num_workers, country_persona, args):
     start_time = time.time()
 
     data = pd.read_csv(csv_file_path)
 
-    data = data[:2]  # select last n rows for testing
+    # data = data[:8]  # select last n rows for testing
     data = data.sort_values(by=['country'], ascending=[True], ignore_index=True)
     # Initialize Dataset Manager
     dataset_manager = DatasetManager(data, batch_size=batch_size, num_workers=num_workers)
     dataloader = dataset_manager.get_dataloader()
 
+
+    #load model
+    model_name = get_model_name_from_path(model_path)
+    tokenizer, model, image_processor, _ = load_pretrained_model(model_path, None, model_name, offload_folder="offload")
+    model.eval()
+
+
     # Initialize Model Evaluator
     evaluator = ModelEvaluator(model_path, dataloader, country_persona)
 
     # Evaluate batches and save results
-    evaluator.evaluate_batches()
+    evaluator.evaluate_batches(tokenizer, model, image_processor, model_name)
     evaluator.save_results(output_dir, csv_file_path.split('/')[-1])
 
     end_time = time.time()
@@ -186,7 +193,7 @@ if __name__ == "__main__":
 
     print(f"Persona: {args.country_persona}")
     # Call the main function
-    main(csv_file_path, model_path, output_dir, args.batch_size, args.num_workers, args.country_persona)
+    main(csv_file_path, model_path, output_dir, args.batch_size, args.num_workers, args.country_persona, args)
 
     # TO DO:
     # Right now data gets saved in the end, but we can save it after each batch is evaluated

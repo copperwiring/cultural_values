@@ -103,10 +103,10 @@ def right_pad_sequence_to_max_length(sequence, max_length, padding_value=0):
     # Create padding of appropriate length and append it to the sequence (right padding)
     return torch.cat([sequence, torch.full((max_length - len(sequence),), padding_value, dtype=sequence.dtype)])
     
-def eval_model(args, prompts_batch, img_files_batch=None, letter_options=None, full_options=None):
+def eval_model(args, prompts_batch, img_files_batch=None, letter_options=None, full_options=None, tokenizer=None, model=None, image_processor=None, model_name=None):
 
-    model_name = get_model_name_from_path(args.model_path)
-    tokenizer, model, image_processor, context_len = load_pretrained_model(args.model_path, args.model_base, model_name, offload_folder="offload")
+    # model_name = get_model_name_from_path(args.model_path)
+    # tokenizer, model, image_processor, context_len = load_pretrained_model(args.model_path, args.model_base, model_name, offload_folder="offload")
 
     # qs = get_prompt(args, model)
 
