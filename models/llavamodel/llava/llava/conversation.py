@@ -329,7 +329,7 @@ conv_llava_v1 = Conversation(
     system="A chat between a curious human and an artificial intelligence assistant. "
            "The assistant gives helpful, detailed, and polite answers to the human's questions.",
     # roles=("USER", "ASSISTANT"),
-    roles=("Human", "("),
+    roles=("Human:", "("),
     messages=(),
     offset=0,
     sep_style=SeparatorStyle.TWO,

@@ -260,9 +260,13 @@ def eval_model(args, prompts_batch, img_files_batch=None, letter_options=None, f
 
         prob_percent = get_prob_percent(top10_token_prob, len_letter_option)
 
+        # check of keys are same as alphabets in cupper case from A - len_letter_option. if not, add the missing keys with 0 value
+        for i in range(65, 65+len_letter_option):
+            if chr(i) not in prob_percent.keys():
+                prob_percent[chr(i)] = 0
+
         # sort prob_percent dict alphabetically by key
         prob_percent_sorted = {k: prob_percent[k] for k in sorted(prob_percent)}
-
 
         # Append the result for this instance in the batch
         batch_results['prompt'].append(prompt)
