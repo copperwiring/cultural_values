@@ -55,7 +55,7 @@ class DatasetCreator:
         USER_PROMPT = """
         Now Look at the observable details in the image. After looking at the image in detail, guess the demography where the image is from. Consider the a) people b) how people look b) their clothes c) the background and any other culturally recognizable things in the image, if any. You are in a simulation game where you live in that demography. \n"""
 
-        USER_CATEGORY_PROMPT = """Now Look at the observable details in the image and notice the {category} traditionally seen/found in the country. Guess the country."""
+        USER_CATEGORY_PROMPT = """Now Look at the observable details in the image and notice the {category} traditionally seen/found in the country. Guess the country. You are in a simulation game where you live in that demography."""
 
         country_prompt: str = (SYSTEM_PROMPT_COUNTRY + RULES + f"Now, if you are someone from {country}, how will you answer the following question. {question_text} \n"
                                f"Options like - 'Don't know', 'No answer', 'Missing; Not available', 'Other missing'; 'Multiple answers Mail (EVS)' etc, always get lowest probabilty/priority/confidence. Here are the options: \n{options_text} \n"

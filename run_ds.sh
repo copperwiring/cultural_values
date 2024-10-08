@@ -19,4 +19,3 @@ source /home/vsl333/cultural_values/culture-values/bin/activate
 
 echo "Running on GPU: $CUDA_VISIBLE_DEVICES"
 python main/run_main_ds.py --model_name 'liuhaotian/llava-v1.5-7b' --output_dir 'output_results' --csv_file_path '/projects/belongielab/people/vsl333/ds/dollarstreet_accurate_images/ds_wvs_metadata.csv' --batch_size 8 --num_workers 1 --country_persona True
-ß

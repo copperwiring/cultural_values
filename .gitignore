@@ -3,6 +3,7 @@ data/
 # image files
 *.png
 *.jpg
+*.out
 
 *.pyc
 

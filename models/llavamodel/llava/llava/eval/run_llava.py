@@ -246,7 +246,8 @@ def eval_model(args, prompts_batch, img_files_batch=None, letter_options=None, f
         # all_tokens = tokenizer.convert_ids_to_tokens(all_indices)
         
         # Get top 10 predicted tokens and their probabilities
-        top_10probs, top_10indices = torch.topk(probs_for_instance, 10)
+        top_k = min(10, probs_for_instance.size(0))  # Ensure k is within the range of available tokens
+        top_10probs, top_10indices = torch.topk(probs_for_instance, top_k)
         top_10tokens = tokenizer.convert_ids_to_tokens(top_10indices)
 
         top10_token_prob = {token: prob for token, prob in zip(top_10tokens, top_10probs)}
