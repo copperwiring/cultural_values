@@ -20,7 +20,7 @@ class DatasetCreator:
         self.wvs_selection = wvs_selection
         self.wvs_options = wvs_options
 
-    def create_prompt(self, question_idx: int, country: str) -> Tuple[str, str, List[str], str]:
+    def create_prompt(self, question_idx: int, country: str, category=None) -> Tuple[str, str, List[str], str]:
         """
         Creates both country-specific and non-country-specific prompts for a given question.
 
@@ -55,6 +55,8 @@ class DatasetCreator:
         USER_PROMPT = """
         Now Look at the observable details in the image. After looking at the image in detail, guess the demography where the image is from. Consider the a) people b) how people look b) their clothes c) the background and any other culturally recognizable things in the image, if any. You are in a simulation game where you live in that demography. \n"""
 
+        USER_CATEGORY_PROMPT = """Now Look at the observable details in the image and notice the {category} traditionally seen/found in the country. Guess the country."""
+
         country_prompt: str = (SYSTEM_PROMPT_COUNTRY + RULES + f"Now, if you are someone from {country}, how will you answer the following question. {question_text} \n"
                                f"Options like - 'Don't know', 'No answer', 'Missing; Not available', 'Other missing'; 'Multiple answers Mail (EVS)' etc, always get lowest probabilty/priority/confidence. Here are the options: \n{options_text} \n"
                                "ASSISTANT: If I had to select one of the options, my answer would be")
@@ -62,7 +64,18 @@ class DatasetCreator:
         generic_prompt: str = (SYSTEM_PROMPT_GENERIC + RULES + USER_PROMPT + f"Based on your best guess about the demography, answer the following question. {question_text} \n"
                                f"Options like - 'Don't know', 'No answer', 'Missing; Not available', 'Other missing'; 'Multiple answers Mail (EVS)' etc, always get lowest probabilty/priority/confidence. Here are the options: \n{options_text} \n "
                                "ASSISTANT: If I had to select one of the options, my answer would be")
-
+        
+        generic_prompt_category: str = (SYSTEM_PROMPT_GENERIC + RULES + USER_CATEGORY_PROMPT + f"Based on your best guess about the demography, answer the following question. {question_text} \n" 
+                                 f"Options like - 'Don't know', 'No answer', 'Missing; Not available', 'Other missing'; 'Multiple answers Mail (EVS)' etc, always get lowest probabilty/priority/confidence. Here are the options: \n{options_text} \n "
+                    
+                                 "ASSISTANT: If I had to select one of the options, my answer would be")
+        # check if categories is not None
+        if category:
+            # breakpoint()
+            generic_prompt = generic_prompt_category.format(category=category)
+        else:
+            generic_prompt = generic_prompt
+        
         # Extract option labels (e.g., (A), (B), (C)) from the options string
         option_labels: List[str] = re.findall(r'\((.)\)', options_text)
 
@@ -84,27 +97,45 @@ class DatasetCreator:
             List[Dict[str, Any]]: Updated dataset with image details, prompts, and options for each image in the country.
         """
         # Filter image data for the given country
-        country_image_data = image_data[image_data['country.name'] == country] 
+        country_image_data = image_data[image_data['country.name'] == country] if 'country.name' in image_data.columns else image_data[image_data['country'] == country]
         image_paths: List[str] = country_image_data['image_full_path'].values
         image_ids: List[int] = country_image_data['id'].values
         selection_answers: List[float] = wvs_selections
 
         # Generate prompts for this question and country
-        question_text, country_prompt, generic_prompt, option_labels, full_options = self.create_prompt(question_idx, country)
+        # check if 'category' is in the image_data columns
+        if 'category' in image_data.columns:
+            for img_path, img_id in zip(image_paths, image_ids):
+                # breakpoint()
+                category = img_path.split('/')[-2: -1][0]
+                question_text, country_prompt, generic_prompt, option_labels, full_options = self.create_prompt(question_idx, country, category)
 
-        # Append data for each image in the country
-        for img_path, img_id in zip(image_paths, image_ids):
-            dataset.append({
-                "id": img_id,
-                "image_path": img_path,
-                "country": country,
-                "question_text": question_text,
-                "country_prompt": country_prompt,
-                "generic_prompt": generic_prompt,
-                "option_labels": option_labels,
-                "full_options": full_options,
-                "selection_answers": [round(answer * 100, 2) for answer in selection_answers]
-            })
+                dataset.append({
+                    "id": img_id,
+                    "image_path": img_path,
+                    "country": country,
+                    "question_text": question_text,
+                    "country_prompt": country_prompt,
+                    "generic_prompt": generic_prompt,
+                    "option_labels": option_labels,
+                    "full_options": full_options,
+                    "selection_answers": [round(answer * 100, 2) for answer in selection_answers]
+                })
+        else:
+            question_text, country_prompt, generic_prompt, option_labels, full_options = self.create_prompt(question_idx, country)
+            # Append data for each image in the country
+            for img_path, img_id in zip(image_paths, image_ids):
+                dataset.append({
+                    "id": img_id,
+                    "image_path": img_path,
+                    "country": country,
+                    "question_text": question_text,
+                    "country_prompt": country_prompt,
+                    "generic_prompt": generic_prompt,
+                    "option_labels": option_labels,
+                    "full_options": full_options,
+                    "selection_answers": [round(answer * 100, 2) for answer in selection_answers]
+                })
 
         return dataset
 
