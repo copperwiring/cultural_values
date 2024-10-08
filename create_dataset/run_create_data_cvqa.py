@@ -27,44 +27,44 @@ def main() -> None:
 
     all_data = []
     country_folder_paths = [f for f in cvqa_data_folder.iterdir() if f.is_dir()]
-    category_folders = [f for country_folder in country_folder_paths for f in country_folder.iterdir() if f.is_dir()]
+    # category_folders = [f for country_folder in country_folder_paths for f in country_folder.iterdir() if f.is_dir()]
 
-    for category_folder in category_folders:
-        image_data = []
-        url_txt_file = [ category_folder / "url.txt", category_folder / "urls.txt"]
-        # if category_folder / "urls.txt" exists rename it to url.txt
-        if url_txt_file[1].exists():
-            shutil.move(url_txt_file[1], url_txt_file[0])
+    # for category_folder in category_folders:
+    #     image_data = []
+    #     url_txt_file = [ category_folder / "url.txt", category_folder / "urls.txt"]
+    #     # if category_folder / "urls.txt" exists rename it to url.txt
+    #     if url_txt_file[1].exists():
+    #         shutil.move(url_txt_file[1], url_txt_file[0])
 
-        # print(f"Reading {url_txt_file}")
-        url_txt_path = category_folder / "url.txt"
-        if url_txt_path.exists():
-            with open(url_txt_path, 'r') as file:
-                for line in file:
-                    image_name, image_url = line.split(',')
-                    image_path = category_folder / image_name
-                    image_path_base = os.path.join(*image_path.parts[-3:-1], image_name)
-                    if image_path.exists() and image_path.suffix in ['.jpg', '.jpeg', '.png']:
-                        image_data.append({
-                            'image_name': image_name,
-                            'image_url': image_url,
-                            'image_path': str(image_path_base),
-                            'category': category_folder.name,
-                            'country': category_folder.parent.name
-                        })
-        all_data.extend(image_data)
+    #     # print(f"Reading {url_txt_file}")
+    #     url_txt_path = category_folder / "url.txt"
+    #     if url_txt_path.exists():
+    #         with open(url_txt_path, 'r') as file:
+    #             for line in file:
+    #                 image_name, image_url = line.split(',')
+    #                 image_path = category_folder / image_name
+    #                 image_path_base = os.path.join(*image_path.parts[-3:-1], image_name)
+    #                 if image_path.exists() and image_path.suffix in ['.jpg', '.jpeg', '.png']:
+    #                     image_data.append({
+    #                         'image_name': image_name,
+    #                         'image_url': image_url,
+    #                         'image_path': str(image_path_base),
+    #                         'category': category_folder.name,
+    #                         'country': category_folder.parent.name
+    #                     })
+    #     all_data.extend(image_data)
     
-    df = pd.DataFrame(all_data)
-    df = df[df['category'] != 'plants_and_animals']
-    # exclude Iran
-    df = df[df['country'] != 'Iran']
-    print(df['country'].value_counts())
-    # Set a seed value for reproducibility
-    seed_value = 42
-    random.seed(seed_value)
+    # df = pd.DataFrame(all_data)
+    # df = df[df['category'] != 'plants_and_animals']
+    # # exclude Iran
+    # df = df[df['country'] != 'Iran']
+    # print(df['country'].value_counts())
+    # # Set a seed value for reproducibility
+    # seed_value = 42
+    # random.seed(seed_value)
 
-    df['id'] = [str(uuid.UUID(int=random.getrandbits(128))) for _ in range(len(df))]
-    df.to_csv(cvqa_data_folder / "metadata.csv", index=False)
+    # df['id'] = [str(uuid.UUID(int=random.getrandbits(128))) for _ in range(len(df))]
+    # df.to_csv(cvqa_data_folder / "metadata.csv", index=False)
 
     # # read the csv file
     df = pd.read_csv(cvqa_data_folder / "metadata.csv")
