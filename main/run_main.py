@@ -148,6 +148,7 @@ def main(csv_file_path, model_path, output_dir, batch_size, num_workers):
     start_time = time.time()
 
     data = pd.read_csv(csv_file_path)
+    
     # data = data[:4]  # select last n rows for testing
     data = data.sort_values(by=['country'], ascending=[True], ignore_index=True)
     # Initialize Dataset Manager

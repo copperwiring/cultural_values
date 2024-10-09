@@ -241,44 +241,86 @@ def eval_model(args, prompts_batch, img_files_batch=None, letter_options=None, f
         len_letter_option = len(ast.literal_eval(letter_option))
         probs_for_instance = probabilities[i]  # Get probabilities for the i-th instance
 
-        # Get all predicted tokens and their probabilities
-        # all_probs, all_indices = torch.topk(probabilities, probabilities.size(0))
-        # all_tokens = tokenizer.convert_ids_to_tokens(all_indices)
-        
-        # Get top 10 predicted tokens and their probabilities
-        top_k = min(10, probs_for_instance.size(0))  # Ensure k is within the range of available tokens
-        top_10probs, top_10indices = torch.topk(probs_for_instance, top_k)
-        top_10tokens = tokenizer.convert_ids_to_tokens(top_10indices)
 
-        top10_token_prob = {token: prob for token, prob in zip(top_10tokens, top_10probs)}
-        top10_token_prob = [(token, prob.item()) for token, prob in top10_token_prob.items()]
+        # if probs_for_instance.dim() == 0 or probs_for_instance.numel() == 0:
+        #     # Handle scalar or empty tensor case, e.g., skip or assign default values
+        #     print("Skipping instance due to scalar or empty tensor")
+        #     continue      
 
-        # Process the options for evaluation
-        # token_prob_options = {token: probs_for_instance[tokenizer.convert_tokens_to_ids(token)] for token in letter_options}
-        # token_prob_options = [(token, prob) for token, prob in token_prob_options.items()]
-        # # sort by probability
-        # token_prob_options = sorted(token_prob_options, key=lambda x: x[1], reverse=True)
+        # if probs_for_instance.dim() > 0:
+        #     top_k = min(10, probs_for_instance.size(0))  # Ensure k is within the range of available tokens
+        # else:
+        #     top_k = 0  # Handle case where there are no dimensions or valid tokens
 
-        prob_percent = get_prob_percent(top10_token_prob, len_letter_option)
+        # top_10probs, top_10indices = torch.topk(probs_for_instance, top_k)
+        # top_10tokens = tokenizer.convert_ids_to_tokens(top_10indices)
 
-        # check of keys are same as alphabets in cupper case from A - len_letter_option. if not, add the missing keys with 0 value
-        for i in range(65, 65+len_letter_option):
-            if chr(i) not in prob_percent.keys():
-                prob_percent[chr(i)] = 0
+        # top10_token_prob = {token: prob for token, prob in zip(top_10tokens, top_10probs)}
+        # top10_token_prob = [(token, prob.item()) for token, prob in top10_token_prob.items()]
 
-        # sort prob_percent dict alphabetically by key
-        prob_percent_sorted = {k: prob_percent[k] for k in sorted(prob_percent)}
+        # prob_percent = get_prob_percent(top10_token_prob, len_letter_option)
+
+        # # check of keys are same as alphabets in cupper case from A - len_letter_option. if not, add the missing keys with 0 value
+        # for i in range(65, 65+len_letter_option):
+        #     if chr(i) not in prob_percent.keys():
+        #         prob_percent[chr(i)] = 0
+
+        # # sort prob_percent dict alphabetically by key
+        # prob_percent_sorted = {k: prob_percent[k] for k in sorted(prob_percent)}
+
+        # # Append the result for this instance in the batch
+        # batch_results['prompt'].append(prompt)
+        # batch_results['options'].append(letter_option)
+        # batch_results['top10_token_prob'].append(top10_token_prob)
+        # batch_results['prob_percent_sorted'].append(prob_percent_sorted)
+        # batch_results['sum_prob_percent_sorted'].append(sum(prob_percent_sorted.values()))
+        # batch_results['prob_percent_keys'].append(list(prob_percent_sorted.keys()))
+        # batch_results['prob_percent_values'].append(list(prob_percent_sorted.values()))
+
+        if probs_for_instance.dim() > 0:
+            top_k = min(10, probs_for_instance.size(0))  # Ensure k is within the range of available tokens
+        else:
+            top_k = 0  # Handle case where there are no dimensions or valid tokens
+
+        if top_k > 0:
+            top_10probs, top_10indices = torch.topk(probs_for_instance, top_k)
+            top_10tokens = tokenizer.convert_ids_to_tokens(top_10indices)
+
+            top10_token_prob = {token: prob for token, prob in zip(top_10tokens, top_10probs)}
+            top10_token_prob = [(token, prob.item()) for token, prob in top10_token_prob.items()]
+        else:
+            top10_token_prob = 0  # No valid tokens, append 0 for easy skipping in analysis
+
+        if top10_token_prob != 0:
+            # Now you can safely calculate prob_percent
+            prob_percent = get_prob_percent(top10_token_prob, len_letter_option)
+
+            # Ensure all keys from A to corresponding letter (A + len_letter_option) are present in prob_percent
+            for i in range(65, 65+len_letter_option):
+                if chr(i) not in prob_percent.keys():
+                    prob_percent[chr(i)] = 0
+
+            # Sort prob_percent dict alphabetically by key
+            prob_percent_sorted = {k: prob_percent[k] for k in sorted(prob_percent)}
+
+            sum_prob_percent_sorted = sum(prob_percent_sorted.values())
+            prob_percent_keys = list(prob_percent_sorted.keys())
+            prob_percent_values = list(prob_percent_sorted.values())
+        else:
+            # No valid tokens, so skip percentage calculation and append default values
+            prob_percent_sorted = 0
+            sum_prob_percent_sorted = 0
+            prob_percent_keys = 0
+            prob_percent_values = 0
 
         # Append the result for this instance in the batch
         batch_results['prompt'].append(prompt)
         batch_results['options'].append(letter_option)
         batch_results['top10_token_prob'].append(top10_token_prob)
         batch_results['prob_percent_sorted'].append(prob_percent_sorted)
-        batch_results['sum_prob_percent_sorted'].append(sum(prob_percent_sorted.values()))
-        batch_results['prob_percent_keys'].append(list(prob_percent_sorted.keys()))
-        batch_results['prob_percent_values'].append(list(prob_percent_sorted.values()))
-
-    # print(f"Batch results: {batch_results}")
+        batch_results['sum_prob_percent_sorted'].append(sum_prob_percent_sorted)
+        batch_results['prob_percent_keys'].append(prob_percent_keys)
+        batch_results['prob_percent_values'].append(prob_percent_values)
 
     return batch_results
            
