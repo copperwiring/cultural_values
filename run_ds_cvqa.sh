@@ -19,8 +19,8 @@ source /home/vsl333/cultural_values/culture-values/bin/activate
 
 csv_file_list=("/home/vsl333/cultural_values/datasets/dollarstreet_accurate_images/ds_wvs_metadata.csv" "/home/vsl333/cultural_values/datasets/cvqa_images/cvqa_wvs_metadata.csv")
 country_persona_list=("true" "false")
-# model_name=("liuhaotian/llava-v1.6-34b" "liuhaotian/llava-v1.6-13b")
-model_name=("liuhaotian/llava-v1.6-34b")
+# model_name=("liuhaotian/llava-v1.6-34b" "liuhaotian/llava-v1.5-13b")
+model_name=("liuhaotian/llava-v1.5-13b")
 
 
  Calculate total number of combinations
