@@ -163,7 +163,11 @@ def main(csv_file_path, model_path, output_dir, batch_size, num_workers, country
 
     #load model
     model_name = get_model_name_from_path(model_path)
-    tokenizer, model, image_processor, _ = load_pretrained_model(model_path, None, model_name, offload_folder="offload")
+    tokenizer, model, image_processor, _ = load_pretrained_model(model_path, 
+                                                                 None, 
+                                                                 model_name, 
+                                                                 offload_folder="offload",
+                                                                 )
     model.eval()
 
 

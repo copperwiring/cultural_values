@@ -20,7 +20,7 @@ source /home/vsl333/cultural_values/culture-values/bin/activate
 csv_file_list=("/home/vsl333/cultural_values/datasets/dollarstreet_accurate_images/ds_wvs_metadata.csv" "/home/vsl333/cultural_values/datasets/cvqa_images/cvqa_wvs_metadata.csv")
 country_persona_list=("true" "false")
 # model_name=("liuhaotian/llava-v1.6-34b" "liuhaotian/llava-v1.5-13b")
-model_name=("liuhaotian/llava-v1.5-13b")
+model_name=("liuhaotian/llava-v1.6-34b")
 
 
  Calculate total number of combinations
@@ -44,6 +44,7 @@ country_persona=${country_persona_list[$persona_index]}
 
 echo "Running on GPU: $CUDA_VISIBLE_DEVICES"
 echo "Slurm Array Task ID: $SLURM_ARRAY_TASK_ID"
+echo "Running on model: $model_name"
 echo "Running on csv file: $csv_file with country_persona: $country_persona"
 
 
