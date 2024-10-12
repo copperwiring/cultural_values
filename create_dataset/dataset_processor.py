@@ -3,6 +3,7 @@ from typing import List, Tuple, Dict, Any
 from tqdm import tqdm
 import pandas as pd
 import pandas as pd
+from pathlib import Path
 
 class DatasetCreator:
     def __init__(self, img_paths: List[str], wvs_questions: List[str], wvs_selection: List[str], wvs_options: List[str]) -> None:
@@ -55,7 +56,7 @@ class DatasetCreator:
         USER_PROMPT = """
         Now Look at the observable details in the image. After looking at the image in detail, guess the demography where the image is from. Consider the a) people b) how people look b) their clothes c) the background and any other culturally recognizable things in the image, if any. You are in a simulation game where you live in that demography. \n"""
 
-        USER_CATEGORY_PROMPT = """Now Look at the observable details in the image and notice the {category} traditionally seen/found in the country. Guess the country. You are in a simulation game where you live in that demography."""
+        USER_CATEGORY_PROMPT = """Now Look at the observable details in the image and notice the popular {category} seen in the country. Also look at the recognizable logos, people, colors, objects, symbols and other things before guessing the country. You are in a simulation game where you live in that demography."""
 
         country_prompt: str = (SYSTEM_PROMPT_COUNTRY + RULES + f"Now, if you are someone from {country}, how will you answer the following question. {question_text} \n"
                                f"Options like - 'Don't know', 'No answer', 'Missing; Not available', 'Other missing'; 'Multiple answers Mail (EVS)' etc, always get lowest probabilty/priority/confidence. Here are the options: \n{options_text} \n"
@@ -107,7 +108,7 @@ class DatasetCreator:
         if 'category' in image_data.columns:
             for img_path, img_id in zip(image_paths, image_ids):
                 # breakpoint()
-                category = img_path.split('/')[-2: -1][0]
+                category = Path(img_path).parent.name
                 question_text, country_prompt, generic_prompt, option_labels, full_options = self.create_prompt(question_idx, country, category)
 
                 dataset.append({

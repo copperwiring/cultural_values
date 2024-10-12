@@ -21,7 +21,7 @@ def main() -> None:
     # Define the data folder path
     
     # CHECK THIS PATH
-    ds_data_folder: str = Path("/projects/belongielab/people/vsl333/ds/dollarstreet_accurate_images")
+    ds_data_folder: str = Path("/home/vsl333/cultural_values/datasets/dollarstreet_accurate_images")
     # cvqa_data_folder: str = "cvqa_chosen"
 
     created_csv_data_csv: str = ds_data_folder / "ds_wvs_metadata.csv"
@@ -72,9 +72,8 @@ def main() -> None:
     ds_country_data = ds_family_data.copy()
 
 
-    # ds_country_data.loc[:, 'imageFullPath'] = f"{ds_data_folder}/dollarstreet/" + ds_country_data['imageRelPath']
     # create new column 'image_full_path' and add it to the dataframe
-    ds_country_data.loc[:, 'image_full_path'] = f"{ds_data_folder}/" + ds_country_data['image_path']
+    ds_country_data.loc[:, 'image_full_path'] = ds_country_data['image_path'].apply(lambda x: Path(ds_data_folder) / x)
     ds_country_data.loc[:, 'image_code'] = "ds"
     ds_country_data.sort_values(by=['country.name'], ascending=True, ignore_index=True, inplace=True)    # cvqa_country_data = data_extractor.prepare_cvqs_img_data(cvqa_data, common_countries)
     # cvqa_country_data.sort_values(by=['country'], ascending=True, ignore_index=True, inplace=True)
