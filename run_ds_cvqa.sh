@@ -51,7 +51,7 @@ echo "Running on csv file: $csv_file with country_persona: $country_persona"
 if [[ "${csv_file}" == *"ds_wvs_metadata.csv" ]]; then
     python main/run_main_ds.py \
         --model_name "${model_name}" \
-        --output_dir 'output_results' \
+        --output_dir 'output_results_llava' \
         --csv_file_path "${csv_file}" \
         --batch_size 18 \
         --num_workers 2 \
@@ -60,7 +60,7 @@ if [[ "${csv_file}" == *"ds_wvs_metadata.csv" ]]; then
 elif [[ "${csv_file}" == *"cvqa_wvs_metadata.csv" ]]; then
     python main/run_main_cvqa.py \
         --model_name "${model_name}" \
-        --output_dir 'output_results' \
+        --output_dir 'output_results_llava' \
         --csv_file_path "${csv_file}" \
         --batch_size 18 \
         --num_workers 2 \

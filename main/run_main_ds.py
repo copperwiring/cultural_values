@@ -124,7 +124,7 @@ class ModelEvaluator:
         for key, value in tqdm(self.results_dict.items()):
             self.combined_results[key] = [item for sublist in value for item in sublist]
 
-    def save_results(self, output_dir, csv_file_name):
+    def save_results(self, output_dir, csv_file_name, model_name):
         # Save the results to a csv file
         combined_results_df = pd.DataFrame(self.combined_results)
 
@@ -136,7 +136,7 @@ class ModelEvaluator:
         combined_results_df['selection_answers'] = selection_answers
 
         print(f"Length of results_df: {len(combined_results_df)}")
-        output_file = os.path.join(output_dir, f"{csv_file_name.split('.')[0]}_test_{self.country_persona}_results.csv")
+        output_file = os.path.join(output_dir, f"{csv_file_name.split('.')[0]}_{model_name}_{self.country_persona}_results.csv")
         
         # Delete file if it exists
         if os.path.exists(output_file):
@@ -167,7 +167,7 @@ def main(csv_file_path, model_path, output_dir, batch_size, num_workers, country
 
     # Evaluate batches and save results
     evaluator.evaluate_batches(tokenizer, model, image_processor, model_name)
-    evaluator.save_results(output_dir, csv_file_path.split('/')[-1])
+    evaluator.save_results(output_dir, csv_file_path.split('/')[-1], model_path.split('/')[-1])
 
     end_time = time.time()
     print(f"Time taken: {end_time - start_time} seconds")
@@ -192,7 +192,7 @@ if __name__ == "__main__":
     csv_file_path = args.csv_file_path
 
     print(f"Persona: {args.country_persona}")
-    print(f"Running DS evaluation script on {csv_file_path} using {model_path}")
+    print(f"Running CVQA evaluation script on {csv_file_path} using {model_path}")
     # Call the main function
     main(csv_file_path, model_path, output_dir, args.batch_size, args.num_workers, args.country_persona, args)
 
