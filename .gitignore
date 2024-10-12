@@ -4,6 +4,7 @@ data/
 *.png
 *.jpg
 *.out
+*.csv
 
 *.pyc
 

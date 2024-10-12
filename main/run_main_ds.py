@@ -149,7 +149,7 @@ def main(csv_file_path, model_path, output_dir, batch_size, num_workers, country
 
     data = pd.read_csv(csv_file_path)
 
-    # data = data[:8]  # select last n rows for testing
+    data = data[:8]  # select last n rows for testing
     data = data.sort_values(by=['country'], ascending=[True], ignore_index=True)
     # Initialize Dataset Manager
     dataset_manager = DatasetManager(data, batch_size=batch_size, num_workers=num_workers)
@@ -192,6 +192,7 @@ if __name__ == "__main__":
     csv_file_path = args.csv_file_path
 
     print(f"Persona: {args.country_persona}")
+    print(f"Running DS evaluation script on {csv_file_path} using {model_path}")
     # Call the main function
     main(csv_file_path, model_path, output_dir, args.batch_size, args.num_workers, args.country_persona, args)
 

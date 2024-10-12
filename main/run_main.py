@@ -124,7 +124,7 @@ class ModelEvaluator:
         for key, value in tqdm(self.results_dict.items()):
             self.combined_results[key] = [item for sublist in value for item in sublist]
 
-    def save_results(self, output_dir, csv_file_name):
+    def save_results(self, output_dir, model_path, csv_file_name):
         # Save the results to a csv file
         combined_results_df = pd.DataFrame(self.combined_results)
 
@@ -136,7 +136,7 @@ class ModelEvaluator:
         combined_results_df['selection_answers'] = selection_answers
 
         print(f"Length of results_df: {len(combined_results_df)}")
-        output_file = os.path.join(output_dir, f"{csv_file_name.split('.')[0]}_{country_persona}_results.csv")
+        output_file = os.path.join(output_dir, f"{csv_file_name.split('.')[0]}_{model_path.split('/')[-1]}_country_{country_persona}_results.csv")
         
         # Delete file if it exists
         if os.path.exists(output_file):
@@ -149,7 +149,7 @@ def main(csv_file_path, model_path, output_dir, batch_size, num_workers):
 
     data = pd.read_csv(csv_file_path)
     
-    # data = data[:4]  # select last n rows for testing
+    data = data[:8]  # select last n rows for testing
     data = data.sort_values(by=['country'], ascending=[True], ignore_index=True)
     # Initialize Dataset Manager
     dataset_manager = DatasetManager(data, batch_size=batch_size, num_workers=num_workers)
@@ -160,7 +160,7 @@ def main(csv_file_path, model_path, output_dir, batch_size, num_workers):
 
     # Evaluate batches and save results
     evaluator.evaluate_batches()
-    evaluator.save_results(output_dir, csv_file_path.split('/')[-1])
+    evaluator.save_results(output_dir, model_path, csv_file_path.split('/')[-1])
 
     end_time = time.time()
     print(f"Time taken: {end_time - start_time} seconds")
