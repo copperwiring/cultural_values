@@ -139,6 +139,7 @@ class ModelEvaluator:
         
         if not os.path.exists(output_dir):
             os.makedirs(output_dir)
+            
         output_file = os.path.join(output_dir, f"{csv_file_name.split('.')[0]}_{model_name}_{self.country_persona}_results.csv")
         
         # Delete file if it exists
