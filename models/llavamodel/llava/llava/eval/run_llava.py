@@ -142,10 +142,9 @@ def eval_model(
         images = []
         for img_files_str in img_files_batch:
             image_files = image_parser(img_files_str, args.sep)
+            print(f"image_files: {image_files}")
             images.extend(load_images(image_files))
-        images_tensor = process_images(images, image_processor, model.config).to(
-            model.device, dtype=torch.float16
-        )
+        images_tensor = process_images(images, image_processor, model.config).to(model.device, dtype=torch.float16)
         image_sizes = [img.size for img in images]
     else:
         images_tensor = None

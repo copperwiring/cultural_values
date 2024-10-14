@@ -1,8 +1,8 @@
 #!/bin/bash
 #SBATCH --job-name=sy_dscvqa
-#SBATCH --array=0-3
-#SBATCH --cpus-per-task=4 --mem=50G
-#SBATCH --gres=gpu:a100:1
+#SBATCH --array=0-1
+#SBATCH --cpus-per-task=6 --mem=80G
+#SBATCH --gres=gpu:h100:1
 #SBATCH --partition=gpu
 #SBATCH --time=0-30:00:00
 
@@ -18,7 +18,9 @@ export PYTHONPATH=$PYTHONPATH:/home/vsl333/cultural_values
 source /home/vsl333/cultural_values/culture-values/bin/activate
 
 csv_file_list=("/home/vsl333/cultural_values/datasets/dollarstreet_accurate_images/ds_wvs_metadata.csv" "/home/vsl333/cultural_values/datasets/cvqa_images/cvqa_wvs_metadata.csv")
-country_persona_list=("true" "false")
+# country_persona_list=("true" "false")
+country_persona_list=("false")
+
 # model_name=("liuhaotian/llava-v1.6-34b" "liuhaotian/llava-v1.5-13b")
 model_name=("liuhaotian/llava-v1.6-34b")
 
@@ -54,7 +56,7 @@ if [[ "${csv_file}" == *"ds_wvs_metadata.csv" ]]; then
         --model_name "${model_name}" \
         --output_dir 'output_results_llava' \
         --csv_file_path "${csv_file}" \
-        --batch_size 18 \
+        --batch_size 1 \
         --num_workers 2 \
         --country_persona "${country_persona}"
 
@@ -63,11 +65,13 @@ elif [[ "${csv_file}" == *"cvqa_wvs_metadata.csv" ]]; then
         --model_name "${model_name}" \
         --output_dir 'output_results_llava' \
         --csv_file_path "${csv_file}" \
-        --batch_size 18 \
+        --batch_size 1 \
         --num_workers 2 \
         --country_persona "${country_persona}"
 else
     echo "Invalid csv file path"
 fi
 
+# Example to run the Python script from the terminal:
+# python main/run_main_ds.py --model_name "liuhaotian/llava-v1.6-34b" --output_dir 'output_results_llava' --csv_file_path "/home/vsl333/cultural_values/datasets/dollarstreet_accurate_images/ds_wvs_metadata.csv" --batch_size 4 --num_workers 2 --country_persona "false"
 
