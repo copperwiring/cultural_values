@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH --job-name=sy_dscvqa
-#SBATCH --array=0-1
+#SBATCH --array=0-3
 #SBATCH --cpus-per-task=6 --mem=80G
 #SBATCH --gres=gpu:h100:1
 #SBATCH --partition=gpu
@@ -18,11 +18,12 @@ export PYTHONPATH=$PYTHONPATH:/home/vsl333/cultural_values
 source /home/vsl333/cultural_values/culture-values/bin/activate
 
 csv_file_list=("/home/vsl333/cultural_values/datasets/dollarstreet_accurate_images/ds_wvs_metadata.csv" "/home/vsl333/cultural_values/datasets/cvqa_images/cvqa_wvs_metadata.csv")
-# country_persona_list=("true" "false")
-country_persona_list=("false")
+# csv_file_list=("/home/vsl333/cultural_values/datasets/cvqa_images/cvqa_wvs_metadata.csv")
+
+country_persona_list=("true" "false")
 
 # model_name=("liuhaotian/llava-v1.6-34b" "liuhaotian/llava-v1.5-13b")
-model_name=("liuhaotian/llava-v1.6-34b")
+model_name=("liuhaotian/llava-v1.5-13b")
 
 
  Calculate total number of combinations
@@ -56,7 +57,7 @@ if [[ "${csv_file}" == *"ds_wvs_metadata.csv" ]]; then
         --model_name "${model_name}" \
         --output_dir 'output_results_llava' \
         --csv_file_path "${csv_file}" \
-        --batch_size 1 \
+        --batch_size 16 \
         --num_workers 2 \
         --country_persona "${country_persona}"
 
@@ -65,7 +66,7 @@ elif [[ "${csv_file}" == *"cvqa_wvs_metadata.csv" ]]; then
         --model_name "${model_name}" \
         --output_dir 'output_results_llava' \
         --csv_file_path "${csv_file}" \
-        --batch_size 1 \
+        --batch_size 16 \
         --num_workers 2 \
         --country_persona "${country_persona}"
 else

@@ -180,41 +180,55 @@ def eval_model(
             print(f"Error parsing letter_option at index {i}: {letter_option}")
             len_letter_option = 0
 
-        probs_for_instance = probabilities[i]
-        top_k = min(20, probs_for_instance.size(0))
+        probs_for_instance = probabilities[i]  # Tensor of size [vocab_size]
+        option_labels = all_uppercase[:len_letter_option]  # ['A', 'B', 'C', ...]
+
+        # For logging purposes, get the top 10 tokens (optional)
+        top_k = min(10, probs_for_instance.size(0))
         if top_k > 0:
             top_probs, top_indices = torch.topk(probs_for_instance, top_k)
             top_tokens = tokenizer.convert_ids_to_tokens(top_indices)
-            option_labels = all_uppercase[:len_letter_option]
-
-            top_token_probs = [
-                (token.upper(), prob.item())
-                for token, prob in zip(top_tokens, top_probs)
-                if token.upper() in option_labels
-            ]
-
-            if not top_token_probs:
-                top_token_probs = []
-
-            if top_token_probs:
-                prob_percent = get_prob_percent(top_token_probs, len_letter_option)
-                for label in option_labels:
-                    if label not in prob_percent:
-                        prob_percent[label] = 0.0
-                prob_percent_sorted = {k: prob_percent[k] for k in sorted(prob_percent)}
-                sum_prob_percent_sorted = sum(prob_percent_sorted.values())
-                prob_percent_keys = list(prob_percent_sorted.keys())
-                prob_percent_values = list(prob_percent_sorted.values())
-            else:
-                prob_percent_sorted = {label: 0.0 for label in option_labels}
-                sum_prob_percent_sorted = 0.0
-                prob_percent_keys = option_labels.copy()
-                prob_percent_values = [0.0] * len_letter_option
+            top_token_probs = [(token, prob.item()) for token, prob in zip(top_tokens, top_probs)]
         else:
-            prob_percent_sorted = {}
-            sum_prob_percent_sorted = 0.0
-            prob_percent_keys = []
-            prob_percent_values = []
+            top_token_probs = []
+
+        # Prepare a mapping from labels to token IDs
+        label_to_token_ids = {}
+        for label in option_labels:
+            # Encode the label to get token IDs without adding special tokens
+            token_ids = tokenizer.encode(label, add_special_tokens=False)
+            if len(token_ids) == 0:
+                print(f"No token IDs found for label '{label}'.")
+                label_to_token_ids[label] = []
+            else:
+                label_to_token_ids[label] = token_ids
+
+        # Compute probabilities for each label directly from the full distribution
+        prob_percent = {}
+        probs_array = probs_for_instance.detach().cpu().numpy()
+        for label in option_labels:
+            token_ids = label_to_token_ids.get(label, [])
+            label_prob = 0.0
+            for token_id in token_ids:
+                label_prob += probs_array[token_id]
+            prob_percent[label] = label_prob
+
+        # Ensure all labels are present in prob_percent
+        for label in option_labels:
+            if label not in prob_percent:
+                prob_percent[label] = 0.0
+
+        # Normalize probabilities to sum to 100%
+        sum_probs = sum(prob_percent.values())
+        if sum_probs > 0:
+            prob_percent_normalized = {k: (v / sum_probs) * 100 for k, v in prob_percent.items()}
+        else:
+            prob_percent_normalized = {k: 0.0 for k in prob_percent}
+
+        prob_percent_sorted = {k: prob_percent_normalized[k] for k in sorted(prob_percent_normalized)}
+        sum_prob_percent_sorted = sum(prob_percent_sorted.values())
+        prob_percent_keys = list(prob_percent_sorted.keys())
+        prob_percent_values = list(prob_percent_sorted.values())
 
         batch_results["prompt"].append(prompt)
         batch_results["options"].append(letter_option)
