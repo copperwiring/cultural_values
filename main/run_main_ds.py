@@ -2,6 +2,7 @@ import os, shutil, time, logging, ast, sys
 import pandas as pd
 # from tqdm import tqdm as tdqm
 from torch.utils.data import Dataset, DataLoader
+import torch
 import argparse
 from tqdm import tqdm
 from pathlib import Path
@@ -11,7 +12,7 @@ from models.llavamodel.llava.llava.model.builder import load_pretrained_model
 
 logging.disable(logging.CRITICAL)  # Disables all logging calls of severity 'CRITICAL' and below
 from models.llavamodel.llava.llava.mm_utils import get_model_name_from_path
-from models.llavamodel.llava.llava.eval.run_llava import eval_model
+from models.llavamodel.llava.llava.eval.run_llava import eval_model, eval_model_72b
 
 
 logging.info("Creating output directory")
@@ -84,7 +85,10 @@ class ModelEvaluator:
             "max_new_tokens": 512
             })()
 
-        batch_results = eval_model(args, prompts_batch, img_files_batch, letter_options, full_options, tokenizer, model, image_processor, model_name)
+        if "72b" in model_name:
+            batch_results = eval_model_72b(args, prompts_batch, img_files_batch, letter_options, full_options, tokenizer, model, image_processor, model_name)
+        else:
+            batch_results = eval_model(args, prompts_batch, img_files_batch, letter_options, full_options, tokenizer, model, image_processor, model_name)
         return batch_results
 
     def evaluate_batches(self, tokenizer, model, image_processor, model_name):
@@ -104,10 +108,12 @@ class ModelEvaluator:
             
             # convert selection_answers to list of floats
             batch['selection_answers'] = [ast.literal_eval(each_sublabel.strip()) for each_sublabel in batch['selection_answers']]
-            
+
+
+
             # Pass the batched data to the evaluation function
             batch_results = self.evaluate_model(prompts_batch, img_files_batch, letter_options, full_options, tokenizer, model, image_processor, model_name)
-            
+
             # Store the results of batched values and batch results
             batch_dict = {**batch, **batch_results}
             
@@ -154,7 +160,7 @@ def main(csv_file_path, model_path, output_dir, batch_size, num_workers, country
 
     data = pd.read_csv(csv_file_path)
 
-    data = data[:8]  # select last n rows for testing
+    # data = data[:100]  # select last n rows for testing
     data = data.sort_values(by=['country'], ascending=[True], ignore_index=True)
     # Initialize Dataset Manager
     dataset_manager = DatasetManager(data, batch_size=batch_size, num_workers=num_workers)
@@ -162,12 +168,24 @@ def main(csv_file_path, model_path, output_dir, batch_size, num_workers, country
 
 
     #load model
-    model_name = get_model_name_from_path(model_path)
-    tokenizer, model, image_processor, _ = load_pretrained_model(model_path, 
-                                                                 None, 
-                                                                 model_name, 
-                                                                 offload_folder="offload",
-                                                                 )
+    if model_path=="llava-hf/llava-next-72b-hf":
+        from transformers import LlavaNextProcessor, LlavaNextForConditionalGeneration
+        processor = LlavaNextProcessor.from_pretrained(model_path)
+        model_name = model_path.split("/")[-1]
+        model = LlavaNextForConditionalGeneration.from_pretrained(model_path,
+                                                                  torch_dtype=torch.float16,
+                                                                  device_map="auto",
+                                                                  use_flash_attention_2=True
+                                                                  )
+        tokenizer=processor.tokenizer
+
+    else:
+        model_name = get_model_name_from_path(model_path)
+        tokenizer, model, processor, _ = load_pretrained_model(model_path,
+                                                                     None,
+                                                                     model_name,
+                                                                     offload_folder="offload",
+                                                                     )
     model.eval()
 
 
@@ -175,7 +193,7 @@ def main(csv_file_path, model_path, output_dir, batch_size, num_workers, country
     evaluator = ModelEvaluator(model_path, dataloader, country_persona)
 
     # Evaluate batches and save results
-    evaluator.evaluate_batches(tokenizer, model, image_processor, model_name)
+    evaluator.evaluate_batches(tokenizer, model, processor, model_name)
     evaluator.save_results(output_dir, csv_file_path.split('/')[-1], model_path.split('/')[-1])
 
     end_time = time.time()
@@ -201,7 +219,7 @@ if __name__ == "__main__":
     csv_file_path = args.csv_file_path
 
     print(f"Persona: {args.country_persona}")
-    print(f"Running CVQA evaluation script on {csv_file_path} using {model_path}")
+    print(f"Running CVQA evaluation script on {csv_file_path} using {model_path}", flush=True)
     # Call the main function
     main(csv_file_path, model_path, output_dir, args.batch_size, args.num_workers, args.country_persona, args)
 

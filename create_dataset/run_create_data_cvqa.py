@@ -23,7 +23,7 @@ def main() -> None:
     # Define the data folder path
     
     # CHECK THIS PATH
-    cvqa_data_folder: str = Path("/home/vsl333/cultural_values/datasets/cvqa_images")
+    cvqa_data_folder: str = Path("datasets/cvqa_images")
 
     all_data = []
     country_folder_paths = [f for f in cvqa_data_folder.iterdir() if f.is_dir()]

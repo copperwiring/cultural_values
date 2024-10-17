@@ -1,29 +1,31 @@
 #!/bin/bash
-#SBATCH --job-name=sy_dscvqa
-#SBATCH --array=0-3
-#SBATCH --cpus-per-task=4 --mem=50G
-#SBATCH --gres=gpu:a100:1
-#SBATCH --partition=gpu
-#SBATCH --time=0-30:00:00
 
-echo $HOSTNAME
-echo $CUDA_VISIBLE_DEVICES
+#Set job requirements
+#SBATCH --array=0-1
+#SBATCH -n 1
+#SBATCH -t 0:50:00
+#SBATCH -p gpu_h100
+#SBATCH --gpus-per-node=2
+#SBATCH --job-name=llava72b
+#SBATCH --output=slurm_output_%A_%a_llava72b.out
 
-cd /home/vsl333/cultural_values
 
-# Set PYTHONPATH to include your desired directory
-export PYTHONPATH=$PYTHONPATH:/home/vsl333/cultural_values
+
+
+
+export PYTHONPATH=$PYTHONPATH:/gpfs/work5/0/prjs0370/zhizhang/projects/cultural_values
 
 # Set up the virtual environment
-source /home/vsl333/cultural_values/culture-values/bin/activate
+source activate llavanext
 
-csv_file_list=("/home/vsl333/cultural_values/datasets/dollarstreet_accurate_images/ds_wvs_metadata.csv" "/home/vsl333/cultural_values/datasets/cvqa_images/cvqa_wvs_metadata.csv")
-country_persona_list=("true" "false")
-# model_name=("liuhaotian/llava-v1.6-34b" "liuhaotian/llava-v1.5-13b")
-model_name=("liuhaotian/llava-v1.6-34b")
+csv_file_list=("datasets/dollarstreet_accurate_images/ds_wvs_metadata.csv" "datasets/cvqa_images/cvqa_wvs_metadata.csv")
+country_persona_list=("true")
+#model_name=("liuhaotian/llava-v1.5-13b")
+#model_name=("liuhaotian/llava-v1.6-34b")
+model_name=("llava-hf/llava-next-72b-hf")
 
 
- Calculate total number of combinations
+#Calculate total number of combinations
 total_csv=${#csv_file_list[@]}
 total_persona=${#country_persona_list[@]}
 total_combinations=$(( total_csv * total_persona ))
@@ -54,7 +56,7 @@ if [[ "${csv_file}" == *"ds_wvs_metadata.csv" ]]; then
         --model_name "${model_name}" \
         --output_dir 'output_results_llava' \
         --csv_file_path "${csv_file}" \
-        --batch_size 18 \
+        --batch_size 8 \
         --num_workers 2 \
         --country_persona "${country_persona}"
 
@@ -63,7 +65,7 @@ elif [[ "${csv_file}" == *"cvqa_wvs_metadata.csv" ]]; then
         --model_name "${model_name}" \
         --output_dir 'output_results_llava' \
         --csv_file_path "${csv_file}" \
-        --batch_size 18 \
+        --batch_size 8 \
         --num_workers 2 \
         --country_persona "${country_persona}"
 else

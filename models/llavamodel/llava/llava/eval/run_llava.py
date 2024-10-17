@@ -116,6 +116,7 @@ def eval_model(
         args.conv_mode = conv_mode
 
     batched_prompts = []
+
     for prompt in prompts_batch:
         args.query = prompt
         qs = get_prompt(args, model)
@@ -128,7 +129,6 @@ def eval_model(
         tokenizer_image_token(prompt, tokenizer, IMAGE_TOKEN_INDEX, return_tensors="pt").squeeze(0)
         for prompt in batched_prompts
     ]
-
     max_len = max(len(tokenized_prompt) for tokenized_prompt in tokenized_prompts)
     padded_tokenized_ids = [
         left_pad_sequence_to_max_length(
@@ -158,7 +158,7 @@ def eval_model(
             image_sizes=image_sizes,
         )
 
-    logits = outputs.logits[:, -1, :]
+    logits = outputs.logits[:, -1, :] #[1, 32000]    outputs.logits [1, 1284, 32000]
     probabilities = F.softmax(logits, dim=-1)
 
     batch_results = {
@@ -174,6 +174,150 @@ def eval_model(
     all_uppercase = list(map(chr, range(65, 91)))  # ['A', 'B', ..., 'Z']
 
     for i, (prompt, letter_option) in enumerate(zip(batched_prompts, letter_options)):
+        try:
+            parsed_options = ast.literal_eval(letter_option)
+            len_letter_option = len(parsed_options)
+        except (ValueError, SyntaxError):
+            print(f"Error parsing letter_option at index {i}: {letter_option}")
+            len_letter_option = 0
+
+        probs_for_instance = probabilities[i]
+        top_k = min(20, probs_for_instance.size(0))
+        if top_k > 0:
+            top_probs, top_indices = torch.topk(probs_for_instance, top_k)
+            top_tokens = tokenizer.convert_ids_to_tokens(top_indices)
+            option_labels = all_uppercase[:len_letter_option]
+
+            top_token_probs = [
+                (token.upper(), prob.item())
+                for token, prob in zip(top_tokens, top_probs)
+                if token.upper() in option_labels
+            ]
+
+            if not top_token_probs:
+                top_token_probs = []
+
+            if top_token_probs:
+                prob_percent = get_prob_percent(top_token_probs, len_letter_option)
+                for label in option_labels:
+                    if label not in prob_percent:
+                        prob_percent[label] = 0.0
+                prob_percent_sorted = {k: prob_percent[k] for k in sorted(prob_percent)}
+                sum_prob_percent_sorted = sum(prob_percent_sorted.values())
+                prob_percent_keys = list(prob_percent_sorted.keys())
+                prob_percent_values = list(prob_percent_sorted.values())
+            else:
+                prob_percent_sorted = {label: 0.0 for label in option_labels}
+                sum_prob_percent_sorted = 0.0
+                prob_percent_keys = option_labels.copy()
+                prob_percent_values = [0.0] * len_letter_option
+        else:
+            prob_percent_sorted = {}
+            sum_prob_percent_sorted = 0.0
+            prob_percent_keys = []
+            prob_percent_values = []
+
+        batch_results["prompt"].append(prompt)
+        batch_results["options"].append(letter_option)
+        batch_results["top10_token_prob"].append(top_token_probs)
+        batch_results["prob_percent_sorted"].append(prob_percent_sorted)
+        batch_results["sum_prob_percent_sorted"].append(sum_prob_percent_sorted)
+        batch_results["prob_percent_keys"].append(prob_percent_keys)
+        batch_results["prob_percent_values"].append(prob_percent_values)
+
+    return batch_results
+
+
+def eval_model_72b(
+    args,
+    prompts_batch,
+    img_files_batch=None,
+    letter_options=None,
+    full_options=None,
+    tokenizer=None,
+    model=None,
+    processor=None,
+    model_name=None,
+):
+
+
+    messages=[]
+    for prmpt in prompts_batch:
+        if img_files_batch:
+            cntent=[
+                    {"type": "image"},
+                    {"type": "text", "text": prmpt},
+                ]
+        else:
+            cntent=[
+                    {"type": "text", "text": prmpt},
+                ]
+        messages.append([
+        {
+            "role": "user",
+            "content": cntent,
+        }])
+
+
+
+
+
+    prompts = [
+        processor.apply_chat_template(msg, tokenize=False, add_generation_prompt=True).replace("ASSISTANT: If I had to select one of the options, my answer would be<|im_end|>\n<|im_start|>assistant\n",
+                   "<|im_start|>assistant\nIf I had to select one of the options, my answer would be (")
+        for msg in messages
+    ]
+
+    # prompt = processor.apply_chat_template(conversation, add_generation_prompt=True)
+    # prompt = prompt.replace("ASSISTANT: If I had to select one of the options, my answer would be<|im_end|>\n<|im_start|>assistant\n",
+    #                "<|im_start|>assistant\nIf I had to select one of the options, my answer would be (")
+    # Open image
+    if img_files_batch==None:
+        image=None
+    else:
+        image = [Image.open(img) for img in img_files_batch]
+
+    processor.tokenizer.padding_side = "left"
+    inputs = processor(images=image, text=prompts, return_tensors="pt", padding=True).to(model.device)
+
+    inputs.update(
+        {
+            "do_sample": False,
+            "temperature": 0,
+            "top_p": None,
+            "num_beams": 1,
+            "max_new_tokens": 1,
+            "use_cache": True,
+            "return_dict_in_generate": True,
+            "output_scores": True,
+            "output_hidden_states": False,
+        }
+    )
+
+    # autoregressively complete prompt
+    with torch.inference_mode():
+        output_details = model.generate(**inputs)
+
+    logits = output_details['scores'][0] #[1, 152064]
+    probabilities = F.softmax(logits, dim=-1)
+
+    output_ids = output_details['sequences'][:, inputs["input_ids"].size(1):]
+    output_text = processor.batch_decode(output_ids, skip_special_tokens=True)
+
+
+    batch_results = {
+        "prompt": [],
+        "options": [],
+        "top10_token_prob": [],
+        "prob_percent_sorted": [],
+        "sum_prob_percent_sorted": [],
+        "prob_percent_keys": [],
+        "prob_percent_values": [],
+    }
+
+    all_uppercase = list(map(chr, range(65, 91)))  # ['A', 'B', ..., 'Z']
+
+    for i, (prompt, letter_option) in enumerate(zip(prompts, letter_options)):
         try:
             parsed_options = ast.literal_eval(letter_option)
             len_letter_option = len(parsed_options)

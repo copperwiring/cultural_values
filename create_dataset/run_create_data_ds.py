@@ -21,7 +21,7 @@ def main() -> None:
     # Define the data folder path
     
     # CHECK THIS PATH
-    ds_data_folder: str = Path("/home/vsl333/cultural_values/datasets/dollarstreet_accurate_images")
+    ds_data_folder: str = Path("datasets/dollarstreet_accurate_images")
     # cvqa_data_folder: str = "cvqa_chosen"
 
     created_csv_data_csv: str = ds_data_folder / "ds_wvs_metadata.csv"
